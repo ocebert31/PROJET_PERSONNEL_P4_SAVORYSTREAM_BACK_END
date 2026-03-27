@@ -1,0 +1,30 @@
+# -----------------------------------------------------------------------------
+# Dependabot : propose des pull requests automatiques pour mettre à jour les
+# dépendances. À fusionner après revue comme n’importe quelle PR.
+# Doc : https://docs.github.com/en/code-security/dependabot
+# -----------------------------------------------------------------------------
+
+# Version du schéma du fichier de configuration Dependabot.
+version: 2
+
+# Liste des « écosystèmes » (types de dépendances) à surveiller.
+updates:
+
+  # --- Gems Ruby (Bundler) ---
+  # Surveille Gemfile et Gemfile.lock : propose des mises à jour de gems.
+- package-ecosystem: bundler
+  # Dossier où se trouve le Gemfile (ici la racine du dépôt).
+  directory: "/"
+  schedule:
+    # Fréquence des vérifications : daily | weekly | monthly.
+    interval: weekly
+  # Plafond de PR Dependabot ouvertes en même temps (évite la surcharge).
+  open-pull-requests-limit: 10
+
+  # --- Workflows GitHub Actions ---
+  # Surveille les versions dans les fichiers .github/workflows (uses: actions/...).
+- package-ecosystem: github-actions
+  directory: "/"
+  schedule:
+    interval: weekly
+  open-pull-requests-limit: 10
