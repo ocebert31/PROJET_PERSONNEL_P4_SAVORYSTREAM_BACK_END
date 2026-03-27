@@ -1,0 +1,119 @@
+# -----------------------------------------------------------------------------
+# CI GitHub Actions : exécute des vérifications à chaque push/PR sur main.
+# -----------------------------------------------------------------------------
+
+# Nom affiché dans l’onglet « Actions » du dépôt GitHub.
+name: CI
+
+# Quand ce workflow se déclenche.
+on:
+  # À chaque pull request (vers n’importe quelle branche cible).
+  pull_request:
+  # À chaque push sur la branche main uniquement.
+  push:
+    branches: [ main ]
+
+# Jobs : groupes de tâches exécutés en parallèle (sauf si dépendances ajoutées).
+jobs:
+
+  # ---------------------------------------------------------------------------
+  # Job 1 — Analyse sécurité Ruby / Rails
+  # ---------------------------------------------------------------------------
+  scan_ruby:
+    # Machine virtuelle Ubuntu fournie par GitHub.
+    runs-on: ubuntu-latest
+
+    steps:
+      # Récupère le code du dépôt dans le répertoire de travail du job.
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      # Installe la version Ruby du .ruby-version et cache les gems Bundler.
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      # Brakeman : analyse statique des risques de sécurité typiques Rails.
+      - name: Scan for common Rails security vulnerabilities using static analysis
+        run: bin/brakeman --no-pager
+
+      # bundler-audit : signale les gems avec CVE connues (base advisory).
+      - name: Scan for known security vulnerabilities in gems used
+        run: bin/bundler-audit
+
+  # ---------------------------------------------------------------------------
+  # Job 2 — Style de code (RuboCop)
+  # ---------------------------------------------------------------------------
+  lint:
+    runs-on: ubuntu-latest
+    env:
+      # Dossier où RuboCop stocke son cache (réutilisé via actions/cache ci-dessous).
+      RUBOCOP_CACHE_ROOT: tmp/rubocop
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      # Cache GitHub Actions : accélère RuboCop en réutilisant le cache entre les runs.
+      - name: Prepare RuboCop cache
+        uses: actions/cache@v4
+        env:
+          # Empreinte des fichiers de config / lock : invalide le cache si ils changent.
+          DEPENDENCIES_HASH: ${{ hashFiles('.ruby-version', '**/.rubocop.yml', '**/.rubocop_todo.yml', 'Gemfile.lock') }}
+        with:
+          path: ${{ env.RUBOCOP_CACHE_ROOT }}
+          # Clé unique par OS, hash des deps, et branche par défaut (run id sur main).
+          key: rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-${{ github.ref_name == github.event.repository.default_branch && github.run_id || 'default' }}
+          # Si la clé exacte manque, utilise un préfixe pour retrouver un cache proche.
+          restore-keys: |
+            rubocop-${{ runner.os }}-${{ env.DEPENDENCIES_HASH }}-
+
+      # Format « github » : annotations directement dans l’interface des fichiers de la PR.
+      - name: Lint code for consistent style
+        run: bin/rubocop -f github
+
+  # ---------------------------------------------------------------------------
+  # Job 3 — Tests automatisés (Rails + PostgreSQL)
+  # ---------------------------------------------------------------------------
+  test:
+    runs-on: ubuntu-latest
+
+    # Service PostgreSQL fourni par GitHub Actions (conteneur auxiliaire pour les tests).
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          # Expose Postgres sur localhost:5432 pour les étapes du job.
+          - 5432:5432
+        # Attend que Postgres réponde à pg_isready avant de lancer les steps.
+        options: --health-cmd="pg_isready" --health-interval=10s --health-timeout=5s --health-retries=3
+
+    steps:
+      # libpq-dev : compilation / lien gem pg ; libvips : souvent requis pour image_processing.
+      - name: Install packages
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y libpq-dev libvips
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+
+      - name: Run tests
+        env:
+          # Environnement Rails pour la suite de tests.
+          RAILS_ENV: test
+          # URL de connexion : même user/mot de passe/port que le service postgres ci-dessus.
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432
+        # Prépare la base de test (migrations) puis lance les tests Minitest.
+        run: bin/rails db:test:prepare test
