@@ -116,4 +116,4 @@ jobs:
           # URL de connexion : même user/mot de passe/port que le service postgres ci-dessus.
           DATABASE_URL: postgres://postgres:postgres@localhost:5432
         # Prépare la base de test (migrations) puis lance la suite RSpec.
-        run: bin/rails db:test:prepare && bundle exec rspec
+        run: bin/rails db:test:prepare && bin/rspec
