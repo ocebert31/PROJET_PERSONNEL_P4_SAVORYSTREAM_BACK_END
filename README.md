@@ -15,7 +15,7 @@ Things you may want to cover:
 
 * Database initialization
 
-* How to run the test suite
+* How to run the test suite: `bundle exec rspec` (run `bin/rails db:test:prepare` first if the test DB is not ready)
 
 * Services (job queues, cache servers, search engines, etc.)
 
