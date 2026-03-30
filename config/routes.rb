@@ -9,6 +9,12 @@ Rails.application.routes.draw do
     namespace :v1 do
       namespace :users do
         resources :registrations, only: [ :create ]
+        resources :sessions, only: [ :create ] do
+          collection do
+            post :refresh
+            post :revoke
+          end
+        end
       end
     end
   end
