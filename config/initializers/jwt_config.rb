@@ -1,6 +1,8 @@
 # frozen_string_literal: true
 
 module JwtConfig
+  REFRESH_COOKIE_NAME = "ss_refresh".freeze
+
   class << self
     def secret
       @secret ||= ENV.fetch("JWT_SECRET_KEY") { Rails.application.secret_key_base }

@@ -21,7 +21,7 @@ RSpec.describe Api::V1::Users::SessionsController, type: :request do
 
   describe "create" do
     context "nominal: valid email and password" do
-      it "returns 200 with access and refresh tokens, user payload, and expiry fields" do
+      it "returns 200 with access token, sets refresh cookie, user payload, and expiry fields" do
         post api_v1_users_sessions_url,
              params: { email: "jane@example.com", password: password, remember_me: false }.to_json,
              headers: json_headers
@@ -29,10 +29,10 @@ RSpec.describe Api::V1::Users::SessionsController, type: :request do
         expect(response).to have_http_status(:ok)
         expect(response_json["message"]).to eq("Connexion réussie.")
         expect(response_json["access_token"]).to be_present
-        expect(response_json["refresh_token"]).to be_present
         expect(response_json["access_expires_in"]).to eq(900)
         expect(response_json["remember_me"]).to be false
         expect(response_json["user"]["email"]).to eq("jane@example.com")
+        expect(response.headers["Set-Cookie"]).to include("ss_refresh=")
         expect(UsersAuthentification.count).to eq(1)
         expect(UsersAuthentification.first.remember_me).to be false
       end
@@ -131,11 +131,10 @@ RSpec.describe Api::V1::Users::SessionsController, type: :request do
     context "nominal: valid refresh_token after login" do
       it "returns 200 with a new access_token and expiry metadata" do
         first = perform_login
-        refresh = first["refresh_token"]
         access1 = first["access_token"]
 
         post refresh_api_v1_users_sessions_url,
-             params: { refresh_token: refresh }.to_json,
+             params: {}.to_json,
              headers: json_headers
 
         expect(response).to have_http_status(:ok)
@@ -167,16 +166,16 @@ RSpec.describe Api::V1::Users::SessionsController, type: :request do
 
     context "nominal: valid refresh_token" do
       it "returns 204 and subsequent refresh with the same token is unauthorized" do
-        refresh = perform_login["refresh_token"]
+        perform_login
 
         post revoke_api_v1_users_sessions_url,
-             params: { refresh_token: refresh }.to_json,
+             params: {}.to_json,
              headers: json_headers
 
         expect(response).to have_http_status(:no_content)
 
         post refresh_api_v1_users_sessions_url,
-             params: { refresh_token: refresh }.to_json,
+             params: {}.to_json,
              headers: json_headers
 
         expect(response).to have_http_status(:unauthorized)
