@@ -29,10 +29,18 @@ module Api
           # JWT d'accès court (durée dans JwtConfig), distinct du refresh.
           access = JwtAccessToken.encode(user.id)
 
+          response.set_cookie(
+            JwtConfig::REFRESH_COOKIE_NAME,
+            value: raw_refresh,
+            httponly: true,
+            secure: Rails.env.production?,
+            same_site: :lax,
+            expires: refresh_record.expires_at
+          )
+
           render json: {
             message: "Connexion réussie.",
             access_token: access,
-            refresh_token: raw_refresh,
             access_expires_in: JwtConfig.access_token_ttl.to_i,
             refresh_expires_at: refresh_record.expires_at.iso8601,
             remember_me: refresh_record.remember_me,
@@ -43,7 +51,7 @@ module Api
         # Émet un nouvel access token à partir d'un refresh token encore valide (non expiré, non révoqué).
         # Le refresh token lui-même n'est pas régénéré ici.
         def refresh
-          raw = params[:refresh_token].presence || params[:refreshToken].presence
+          raw = cookies[JwtConfig::REFRESH_COOKIE_NAME].presence
           record = UsersAuthentification.find_valid(raw)
           unless record
             return render json: { message: "Refresh token invalide ou expiré." }, status: :unauthorized
@@ -61,13 +69,14 @@ module Api
 
         # Déconnexion côté API : marque le refresh token comme révoqué (revoked_at) pour qu'il ne soit plus accepté.
         def revoke
-          raw = params[:refresh_token].presence || params[:refreshToken].presence
+          raw = cookies[JwtConfig::REFRESH_COOKIE_NAME].presence
           record = UsersAuthentification.find_valid(raw)
           unless record
             return render json: { message: "Refresh token invalide ou expiré." }, status: :unauthorized
           end
 
           record.revoke!
+          response.delete_cookie(JwtConfig::REFRESH_COOKIE_NAME, httponly: true, secure: Rails.env.production?, same_site: :lax)
           head :no_content
         end
 
