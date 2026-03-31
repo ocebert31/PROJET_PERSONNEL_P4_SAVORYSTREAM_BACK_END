@@ -64,8 +64,9 @@ RSpec.describe JwtAccessToken do
     context "when token signature is wrong" do
       it "returns nil" do
         token = described_class.encode(user_id)
-        header, _payload, sig = token.split(".")
-        tampered = [ header, _payload, sig.tr("A", "B") ].join(".")
+        header, payload, sig = token.split(".")
+        tampered_sig = sig.sub(/.$/, sig.end_with?("A") ? "B" : "A")
+        tampered = [ header, payload, tampered_sig ].join(".")
 
         expect(described_class.decode(tampered)).to be_nil
       end
