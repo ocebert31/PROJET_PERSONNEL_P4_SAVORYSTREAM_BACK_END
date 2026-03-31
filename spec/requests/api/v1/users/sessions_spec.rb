@@ -105,7 +105,7 @@ RSpec.describe Api::V1::Users::SessionsController, type: :request do
              headers: json_headers
 
         expect(response).to have_http_status(:unauthorized)
-        expect(response_json["message"]).to eq("Identifiants invalides.")
+        expect(response_json["message"]).to eq("Impossible de vous connecter. Vérifiez vos informations.")
       end
     end
 
