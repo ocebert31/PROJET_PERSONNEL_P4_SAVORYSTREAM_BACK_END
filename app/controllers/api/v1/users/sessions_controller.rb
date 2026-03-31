@@ -16,7 +16,7 @@ module Api
 
           user = find_user(identification)
           unless user&.authenticate(session_params[:password])
-            return render json: { message: "Identifiants invalides." }, status: :unauthorized
+            return render json: { message: "Impossible de vous connecter. Vérifiez vos informations." }, status: :unauthorized
           end
 
           # « Se souvenir de moi » : accepte remember_me ou rememberMe (camelCase), défaut false si absent (évite nil).
