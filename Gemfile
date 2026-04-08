@@ -36,6 +36,10 @@ group :development, :test do
 
   # Spec framework (https://rspec.info/)
   gem "rspec-rails", "~> 8.0"
+  gem "factory_bot_rails", "~> 6.4"
+
+  # Charge automatiquement le fichier local `.env` (utile pour les seeds)
+  gem "dotenv-rails"
 
   # Audits gems for known security defects (use config/bundler-audit.yml to ignore issues)
   gem "bundler-audit", require: false

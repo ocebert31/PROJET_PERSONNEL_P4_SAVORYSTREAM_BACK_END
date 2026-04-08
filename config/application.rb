@@ -29,6 +29,16 @@ module ProjetPersonnelP4SavorystreamBackEnd
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
 
+    # PORO de filtrage des paramètres HTTP (voir app/params).
+    params_root = Rails.root.join("app/params")
+    config.autoload_paths << params_root
+    config.eager_load_paths << params_root
+
+    # Objets de mapping requête / domaine (voir app/mappers).
+    mappers_root = Rails.root.join("app/mappers")
+    config.autoload_paths << mappers_root
+    config.eager_load_paths << mappers_root
+
     config.generators do |g|
       g.test_framework :rspec
     end

@@ -4,15 +4,13 @@ module Api
   module V1
     module Users
       class RegistrationsController < ApplicationController
-        include UserResponse
-
         def create
           @user = User.new(user_attributes)
 
           if @user.save
             render json: {
               message: "Inscription réussie.",
-              user: user_json(@user)
+              user: UserSerializer.call(@user)
             }, status: :created
           else
             render json: { errors: @user.errors.messages }, status: :unprocessable_entity

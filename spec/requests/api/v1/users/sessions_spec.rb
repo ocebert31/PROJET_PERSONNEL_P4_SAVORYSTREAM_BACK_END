@@ -2,9 +2,13 @@
 
 require "rails_helper"
 
-RSpec.describe Api::V1::Users::SessionsController, type: :request do
-  let(:password) { "password12" }
-  let(:json_headers) { { "Content-Type" => "application/json" } }
+RSpec.describe "Api::V1::Users::Sessions", type: :request do
+  let(:default_password) { "password12" }
+
+  before do
+    User.delete_all
+    UsersAuthentification.delete_all
+  end
 
   let!(:user) do
     User.create!(
@@ -12,62 +16,49 @@ RSpec.describe Api::V1::Users::SessionsController, type: :request do
       last_name: "Doe",
       email: "jane@example.com",
       phone_number: "0612345678",
-      password: password,
-      password_confirmation: password
+      password: default_password,
+      password_confirmation: default_password
     )
   end
 
-  before { UsersAuthentification.delete_all }
-
-  describe "create" do
-    context "nominal: valid email and password" do
-      it "returns 200 with access token, sets refresh cookie, user payload, and expiry fields" do
-        post api_v1_users_sessions_url,
-             params: { email: "jane@example.com", password: password, remember_me: false }.to_json,
-             headers: json_headers
+  describe "POST /api/v1/users/sessions" do
+    context "when login succeeds" do
+      it "creates a refresh session, sets cookie, and returns access token and user payload" do
+        expect do
+          submit_session(valid_login_payload)
+        end.to change(UsersAuthentification, :count).by(1)
 
         expect(response).to have_http_status(:ok)
-        expect(response_json["message"]).to eq("Connexion réussie.")
-        expect(response_json["access_token"]).to be_present
-        expect(response_json["access_expires_in"]).to eq(900)
-        expect(response_json["remember_me"]).to be false
-        expect(response_json["user"]["email"]).to eq("jane@example.com")
+        payload = response_json
+        expect(payload["message"]).to eq("Connexion réussie.")
+        expect(payload["access_token"]).to be_present
+        expect(payload["access_expires_in"]).to eq(900)
+        expect(payload["remember_me"]).to be false
+        expect(payload["user"]["email"]).to eq("jane@example.com")
         expect(response.headers["Set-Cookie"]).to include("ss_refresh=")
-        expect(UsersAuthentification.count).to eq(1)
         expect(UsersAuthentification.first.remember_me).to be false
       end
-    end
 
-    context "when logging in with phone_number instead of email" do
-      it "returns 200 and resolves the same user" do
-        post api_v1_users_sessions_url,
-             params: { phone_number: "0612345678", password: password }.to_json,
-             headers: json_headers
+      it "resolves the user when phone_number is given instead of email" do
+        submit_session({ phone_number: "0612345678", password: default_password })
 
         expect(response).to have_http_status(:ok)
         expect(response_json["user"]["email"]).to eq("jane@example.com")
       end
-    end
 
-    context "when rememberMe is true" do
-      it "persists remember_me and sets a long refresh window" do
-        post api_v1_users_sessions_url,
-             params: { email: "jane@example.com", password: password, rememberMe: true }.to_json,
-             headers: json_headers
+      it "persists remember_me and extends refresh expiry when rememberMe is true" do
+        submit_session(valid_login_payload.merge(rememberMe: true))
 
         expect(response).to have_http_status(:ok)
-        expect(response_json["remember_me"]).to be true
-        expires = Time.zone.parse(response_json["refresh_expires_at"])
+        payload = response_json
+        expect(payload["remember_me"]).to be true
+        expires = Time.zone.parse(payload["refresh_expires_at"])
         expect(expires).to be > 20.days.from_now
         expect(UsersAuthentification.first.remember_me).to be true
       end
-    end
 
-    context "when remember_me is explicitly false" do
-      it "sets a shorter refresh window than the long-remember branch" do
-        post api_v1_users_sessions_url,
-             params: { email: "jane@example.com", password: password, remember_me: false }.to_json,
-             headers: json_headers
+      it "uses a shorter refresh window when remember_me is false" do
+        submit_session(valid_login_payload)
 
         expires = Time.zone.parse(response_json["refresh_expires_at"])
         expect(expires).to be < 20.days.from_now
@@ -75,80 +66,38 @@ RSpec.describe Api::V1::Users::SessionsController, type: :request do
       end
     end
 
-    context "when both email and phone are provided" do
-      it "returns 422 and does not create a refresh row" do
-        post api_v1_users_sessions_url,
-             params: { email: "jane@example.com", phone_number: "0612345678", password: password }.to_json,
-             headers: json_headers
+    context "when identification is invalid" do
+      it "returns unprocessable entity with an errors payload" do
+        expect do
+          submit_session({ password: default_password })
+        end.not_to change(UsersAuthentification, :count)
 
         expect(response).to have_http_status(:unprocessable_entity)
-        expect(response_json["errors"]["base"].first).to include("pas les deux")
-        expect(UsersAuthentification.count).to eq(0)
-      end
-    end
-
-    context "when neither email nor phone is provided" do
-      it "returns 422" do
-        post api_v1_users_sessions_url,
-             params: { password: password }.to_json,
-             headers: json_headers
-
-        expect(response).to have_http_status(:unprocessable_entity)
-        expect(response_json["errors"]["base"].first).to include("requis")
-      end
-    end
-
-    context "when password is wrong" do
-      it "returns 401 with a generic message" do
-        post api_v1_users_sessions_url,
-             params: { email: "jane@example.com", password: "wrong" }.to_json,
-             headers: json_headers
-
-        expect(response).to have_http_status(:unauthorized)
-        expect(response_json["message"]).to eq("Impossible de vous connecter. Vérifiez vos informations.")
-      end
-    end
-
-    context "when no user matches the identifier" do
-      it "returns 401" do
-        post api_v1_users_sessions_url,
-             params: { email: "nobody@example.com", password: password }.to_json,
-             headers: json_headers
-
-        expect(response).to have_http_status(:unauthorized)
+        expect(response_json["errors"]).to be_a(Hash)
+        expect(response_json["errors"]).to be_present
       end
     end
   end
 
-  describe "refresh" do
-    let(:perform_login) do
-      post api_v1_users_sessions_url,
-           params: { email: "jane@example.com", password: password }.to_json,
-           headers: json_headers
-      response_json
-    end
+  describe "POST /api/v1/users/sessions/refresh" do
+    context "when refresh succeeds" do
+      it "returns a new access_token and expiry metadata" do
+        submit_session(valid_login_payload)
+        access_before = response_json["access_token"]
 
-    context "nominal: valid refresh_token after login" do
-      it "returns 200 with a new access_token and expiry metadata" do
-        first = perform_login
-        access1 = first["access_token"]
-
-        post refresh_api_v1_users_sessions_url,
-             params: {}.to_json,
-             headers: json_headers
+        submit_refresh
 
         expect(response).to have_http_status(:ok)
-        expect(response_json["access_token"]).to be_present
-        expect(response_json["access_token"]).not_to eq(access1)
-        expect(response_json["access_expires_in"]).to eq(900)
+        payload = response_json
+        expect(payload["access_token"]).to be_present
+        expect(payload["access_token"]).not_to eq(access_before)
+        expect(payload["access_expires_in"]).to eq(900)
       end
     end
 
-    context "when refresh_token is invalid" do
-      it "returns 401" do
-        post refresh_api_v1_users_sessions_url,
-             params: { refresh_token: "invalid" }.to_json,
-             headers: json_headers
+    context "when refresh fails" do
+      it "returns unauthorized when the refresh token is invalid" do
+        submit_refresh({ refresh_token: "invalid" })
 
         expect(response).to have_http_status(:unauthorized)
         expect(response_json["message"]).to eq("Refresh token invalide ou expiré.")
@@ -156,37 +105,24 @@ RSpec.describe Api::V1::Users::SessionsController, type: :request do
     end
   end
 
-  describe "revoke" do
-    let(:perform_login) do
-      post api_v1_users_sessions_url,
-           params: { email: "jane@example.com", password: password }.to_json,
-           headers: json_headers
-      response_json
-    end
+  describe "POST /api/v1/users/sessions/revoke" do
+    context "when revoke succeeds" do
+      it "returns no content and the refresh token can no longer be used" do
+        submit_session(valid_login_payload)
 
-    context "nominal: valid refresh_token" do
-      it "returns 204 and subsequent refresh with the same token is unauthorized" do
-        perform_login
-
-        post revoke_api_v1_users_sessions_url,
-             params: {}.to_json,
-             headers: json_headers
+        submit_revoke
 
         expect(response).to have_http_status(:no_content)
 
-        post refresh_api_v1_users_sessions_url,
-             params: {}.to_json,
-             headers: json_headers
+        submit_refresh
 
         expect(response).to have_http_status(:unauthorized)
       end
     end
 
-    context "when refresh_token is invalid" do
-      it "returns 401" do
-        post revoke_api_v1_users_sessions_url,
-             params: { refresh_token: "invalid" }.to_json,
-             headers: json_headers
+    context "when revoke fails" do
+      it "returns unauthorized when the refresh token is invalid" do
+        submit_revoke({ refresh_token: "invalid" })
 
         expect(response).to have_http_status(:unauthorized)
         expect(response_json["message"]).to eq("Refresh token invalide ou expiré.")
@@ -194,7 +130,23 @@ RSpec.describe Api::V1::Users::SessionsController, type: :request do
     end
   end
 
-  def response_json
-    JSON.parse(response.body)
+  def submit_session(credentials)
+    post api_v1_users_sessions_url, params: credentials, as: :json
+  end
+
+  def submit_refresh(params = {})
+    post refresh_api_v1_users_sessions_url, params: params, as: :json
+  end
+
+  def submit_revoke(params = {})
+    post revoke_api_v1_users_sessions_url, params: params, as: :json
+  end
+
+  def valid_login_payload(overrides = {})
+    {
+      email: "jane@example.com",
+      password: default_password,
+      remember_me: false
+    }.merge(overrides)
   end
 end

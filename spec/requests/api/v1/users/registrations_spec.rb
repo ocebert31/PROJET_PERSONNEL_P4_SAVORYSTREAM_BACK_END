@@ -50,10 +50,6 @@ RSpec.describe "Api::V1::Users::Registrations", type: :request do
     post api_v1_users_registrations_url, params: registration_params, as: :json
   end
 
-  def response_json
-    JSON.parse(response.body)
-  end
-
   def valid_registration_payload(overrides = {})
     {
       first_name: "Jane",
