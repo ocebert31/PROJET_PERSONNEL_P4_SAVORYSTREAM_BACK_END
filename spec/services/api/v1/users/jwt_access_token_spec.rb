@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe JwtAccessToken do
+RSpec.describe Api::V1::Users::JwtAccessToken do
   include ActiveSupport::Testing::TimeHelpers
 
   let(:user_id) { SecureRandom.uuid }
@@ -65,7 +65,8 @@ RSpec.describe JwtAccessToken do
       it "returns nil" do
         token = described_class.encode(user_id)
         header, payload, sig = token.split(".")
-        tampered_sig = sig.sub(/.$/, sig.end_with?("A") ? "B" : "A")
+        # Appending extra data to signature guarantees mismatch without relying on character replacement.
+        tampered_sig = "#{sig}x"
         tampered = [ header, payload, tampered_sig ].join(".")
 
         expect(described_class.decode(tampered)).to be_nil

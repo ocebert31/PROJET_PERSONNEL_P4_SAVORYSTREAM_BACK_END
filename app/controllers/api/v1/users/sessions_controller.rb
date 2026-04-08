@@ -4,8 +4,6 @@ module Api
   module V1
     module Users
       class SessionsController < ApplicationController
-        include UserResponse
-
         # Connexion : valide email ou téléphone + mot de passe, puis émet un JWT d'accès et un refresh token
         # persisté (table users_authentification). Réponse inclut l'utilisateur et les durées d'expiration.
         def create
@@ -44,7 +42,7 @@ module Api
             access_expires_in: JwtConfig.access_token_ttl.to_i,
             refresh_expires_at: refresh_record.expires_at.iso8601,
             remember_me: refresh_record.remember_me,
-            user: user_json(user)
+            user: UserSerializer.call(user)
           }, status: :ok
         end
 

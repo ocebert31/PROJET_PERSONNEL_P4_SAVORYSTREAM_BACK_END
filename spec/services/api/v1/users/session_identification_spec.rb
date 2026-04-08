@@ -2,7 +2,7 @@
 
 require "rails_helper"
 
-RSpec.describe SessionIdentification do
+RSpec.describe Api::V1::Users::SessionIdentification do
   describe "valid" do
     context "nominal: email only" do
       it "is valid" do
