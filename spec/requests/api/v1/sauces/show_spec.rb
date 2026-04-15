@@ -33,21 +33,6 @@ RSpec.describe "Api::V1::Sauces::ShowController", type: :request do
         expect(url).to include("rails/active_storage")
       end
 
-      it "returns the stored image_url column when no file is attached" do
-        sauce = Sauce.create!(
-          name: "Sriracha Show External",
-          tagline: "URL seulement.",
-          category: category,
-          is_available: true,
-          image_url: "https://cdn.example.com/sauce.png"
-        )
-
-        get api_v1_sauce_url(sauce.id), headers: admin_headers
-
-        expect(response).to have_http_status(:ok)
-        expect(response_json["sauce"]["image_url"]).to eq("https://cdn.example.com/sauce.png")
-      end
-
       it "returns not found for an unknown id" do
         unknown_id = "00000000-0000-0000-0000-000000000001"
 

@@ -13,7 +13,6 @@ RSpec.describe Api::V1::Sauces::SauceSerializer do
         tagline: "Spicy",
         description: "Thai style",
         characteristic: "Heat",
-        image_url: "https://cdn.example.com/sauce.png",
         is_available: true
       )
       stock = create(:stock, sauce: sauce, quantity: 42)
@@ -28,7 +27,7 @@ RSpec.describe Api::V1::Sauces::SauceSerializer do
       expect(json[:tagline]).to eq("Spicy")
       expect(json[:description]).to eq("Thai style")
       expect(json[:characteristic]).to eq("Heat")
-      expect(json[:image_url]).to eq("https://cdn.example.com/sauce.png")
+      expect(json[:image_url]).to be_nil
       expect(json[:is_available]).to be true
       expect(json[:category]).to eq(id: category.id, name: "Hot")
       expect(json[:stock]).to eq(id: stock.id, quantity: 42)

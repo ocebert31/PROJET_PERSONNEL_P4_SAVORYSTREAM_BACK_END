@@ -9,20 +9,22 @@ RSpec.describe "Api::V1::Sauces::CreateController", type: :request do
   describe "POST /api/v1/sauces" do
     context "when authenticated as admin" do
       it "creates a sauce with nested stock, conditionings, and ingredients" do
+        file = fixture_file_upload(Rails.root.join("spec/fixtures/files/one_pixel.png"), "image/png")
+
         post api_v1_sauces_url,
              params: {
                name: "Sriracha Create Spec",
                tagline: "Pimente tout.",
                description: "Une sauce relevée et équilibrée.",
                characteristic: "Piquante",
-               image_url: "https://example.com/sriracha.png",
                is_available: true,
                category_id: category.id,
+               image: file,
                stock: { quantity: 12 },
                conditionings: [ { volume: "250ml", price: "6.90" } ],
                ingredients: [ { name: "Piment", quantity: "30%" } ]
-             }.to_json,
-             headers: admin_headers.merge(json_headers)
+             },
+             headers: admin_headers
 
         expect(response).to have_http_status(:created)
         expect(response_json["message"]).to eq("Sauce créée.")
@@ -39,8 +41,13 @@ RSpec.describe "Api::V1::Sauces::CreateController", type: :request do
              params: {
                name: "SauceImage Create Spec",
                tagline: "Avec image.",
+               description: "Description obligatoire.",
+               characteristic: "Caracteristique obligatoire.",
                category_id: category.id,
                is_available: true,
+               stock: { quantity: 8 },
+               conditionings: [ { volume: "150ml", price: "4.50" } ],
+               ingredients: [ { name: "Ail", quantity: "5%" } ],
                image: file
              },
              headers: admin_headers
@@ -51,15 +58,22 @@ RSpec.describe "Api::V1::Sauces::CreateController", type: :request do
         expect(response_json["sauce"]["image_url"]).to include("rails/active_storage")
       end
 
-      # One failure case: documents HTTP 422 + errors shape (field rules live in Sauce / model specs).
-      it "returns unprocessable entity with errors when the record cannot be saved" do
+      it "returns unprocessable entity with required field errors when payload is incomplete" do
         post api_v1_sauces_url,
              params: { name: "Incomplete" }.to_json,
              headers: admin_headers.merge(json_headers)
 
         expect(response).to have_http_status(:unprocessable_entity)
         expect(response_json["errors"]).to be_a(Hash)
-        expect(response_json["errors"]).to be_present
+        expect(response_json["errors"]["tagline"]).to be_present
+        expect(response_json["errors"]["description"]).to be_present
+        expect(response_json["errors"]["characteristic"]).to be_present
+        expect(response_json["errors"]["category_id"]).to be_present
+        expect(response_json["errors"]["is_available"]).to be_present
+        expect(response_json["errors"]["image"]).to be_present
+        expect(response_json["errors"]["stock"]).to be_present
+        expect(response_json["errors"]["conditionings"]).to be_present
+        expect(response_json["errors"]["ingredients"]).to be_present
       end
     end
 
