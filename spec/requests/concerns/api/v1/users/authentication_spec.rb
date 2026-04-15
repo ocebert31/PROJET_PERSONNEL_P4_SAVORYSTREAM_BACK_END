@@ -27,6 +27,10 @@ RSpec.describe Api::V1::Users::Authentication, type: :controller do
     def bearer_token_probe
       render json: { token: bearer_token }
     end
+
+    def raw_access_token_probe
+      render json: { raw: raw_access_token }, status: :ok
+    end
   end
 
   before do
@@ -35,6 +39,7 @@ RSpec.describe Api::V1::Users::Authentication, type: :controller do
       get :authenticate_admin_probe, to: "anonymous#authenticate_admin_probe"
       get :authenticate_user_probe, to: "anonymous#authenticate_user_probe"
       get :bearer_token_probe, to: "anonymous#bearer_token_probe"
+      get :raw_access_token_probe, to: "anonymous#raw_access_token_probe"
     end
   end
 
@@ -193,6 +198,56 @@ RSpec.describe Api::V1::Users::Authentication, type: :controller do
       get :bearer_token_probe
 
       expect(json_response["token"]).to be_nil
+    end
+  end
+
+  describe "#raw_access_token" do
+    let(:bearer_value) { "from-bearer.jwt" }
+    let(:cookie_value) { "from-cookie.jwt" }
+
+    it "returns the Bearer token when Authorization is set" do
+      request.headers["Authorization"] = "Bearer #{bearer_value}"
+
+      get :raw_access_token_probe
+
+      expect(response).to have_http_status(:ok)
+      expect(json_response["raw"]).to eq(bearer_value)
+    end
+
+    it "returns the access cookie when there is no Bearer token" do
+      request.cookies[JwtConfig::ACCESS_COOKIE_NAME] = cookie_value
+
+      get :raw_access_token_probe
+
+      expect(response).to have_http_status(:ok)
+      expect(json_response["raw"]).to eq(cookie_value)
+    end
+
+    it "prefers the Bearer token over the access cookie when both are present" do
+      request.headers["Authorization"] = "Bearer #{bearer_value}"
+      request.cookies[JwtConfig::ACCESS_COOKIE_NAME] = cookie_value
+
+      get :raw_access_token_probe
+
+      expect(response).to have_http_status(:ok)
+      expect(json_response["raw"]).to eq(bearer_value)
+    end
+
+    it "returns the cookie when Authorization is present but Bearer payload is blank" do
+      request.headers["Authorization"] = "Bearer   "
+      request.cookies[JwtConfig::ACCESS_COOKIE_NAME] = cookie_value
+
+      get :raw_access_token_probe
+
+      expect(response).to have_http_status(:ok)
+      expect(json_response["raw"]).to eq(cookie_value)
+    end
+
+    it "returns nil when neither Bearer nor cookie is present" do
+      get :raw_access_token_probe
+
+      expect(response).to have_http_status(:ok)
+      expect(json_response["raw"]).to be_nil
     end
   end
 end

@@ -2,6 +2,7 @@
 
 module JwtConfig
   REFRESH_COOKIE_NAME = "ss_refresh".freeze
+  ACCESS_COOKIE_NAME = "ss_access".freeze
 
   class << self
     def secret

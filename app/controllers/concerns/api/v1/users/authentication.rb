@@ -21,7 +21,7 @@ module Api
         end
 
         def authenticate_user!
-          payload = JwtAccessToken.decode(bearer_token)
+          payload = JwtAccessToken.decode(raw_access_token)
           unless payload&.dig("typ") == "access"
             return render json: { message: "Token d'accès invalide ou manquant." }, status: :unauthorized
           end
@@ -35,6 +35,10 @@ module Api
         def bearer_token
           auth_header = request.headers["Authorization"].to_s
           auth_header.start_with?("Bearer ") ? auth_header.delete_prefix("Bearer ").strip : nil
+        end
+
+        def raw_access_token
+          bearer_token.presence || cookies[JwtConfig::ACCESS_COOKIE_NAME].presence
         end
       end
     end
