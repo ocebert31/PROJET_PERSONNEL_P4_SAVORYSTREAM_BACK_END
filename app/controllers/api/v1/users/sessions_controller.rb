@@ -4,6 +4,13 @@ module Api
   module V1
     module Users
       class SessionsController < ApplicationController
+        include Api::V1::Users::Authentication
+
+        # Toujours « / » : si le path est omis, certains navigateurs restreignent le cookie au sous-chemin
+        # de la requête (ex. login sur …/users/sessions) et il n’est plus envoyé sur …/sauces.
+        # Constante ici (pas dans un initializer seul) pour éviter un NameError en rechargement à chaud.
+        AUTH_COOKIE_PATH = "/".freeze
+
         # Connexion : valide email ou téléphone + mot de passe, puis émet un JWT d'accès et un refresh token
         # persisté (table users_authentification). Réponse inclut l'utilisateur et les durées d'expiration.
         def create
@@ -30,11 +37,13 @@ module Api
           response.set_cookie(
             JwtConfig::REFRESH_COOKIE_NAME,
             value: raw_refresh,
+            path: AUTH_COOKIE_PATH,
             httponly: true,
             secure: Rails.env.production?,
             same_site: :lax,
             expires: refresh_record.expires_at
           )
+          set_access_cookie(access)
 
           render json: {
             message: "Connexion réussie.",
@@ -57,12 +66,20 @@ module Api
 
           user = record.user
           access = JwtAccessToken.encode(user.id)
+          set_access_cookie(access)
 
           render json: {
             access_token: access,
             access_expires_in: JwtConfig.access_token_ttl.to_i,
             refresh_expires_at: record.expires_at.iso8601
           }, status: :ok
+        end
+
+        def me
+          authenticate_user!
+          return if performed?
+
+          render json: { user: UserSerializer.call(current_user) }, status: :ok
         end
 
         # Déconnexion côté API : marque le refresh token comme révoqué (revoked_at) pour qu'il ne soit plus accepté.
@@ -74,11 +91,36 @@ module Api
           end
 
           record.revoke!
-          response.delete_cookie(JwtConfig::REFRESH_COOKIE_NAME, httponly: true, secure: Rails.env.production?, same_site: :lax)
+          response.delete_cookie(
+            JwtConfig::REFRESH_COOKIE_NAME,
+            path: AUTH_COOKIE_PATH,
+            httponly: true,
+            secure: Rails.env.production?,
+            same_site: :lax
+          )
+          response.delete_cookie(
+            JwtConfig::ACCESS_COOKIE_NAME,
+            path: AUTH_COOKIE_PATH,
+            httponly: true,
+            secure: Rails.env.production?,
+            same_site: :lax
+          )
           head :no_content
         end
 
         private
+
+        def set_access_cookie(access)
+          response.set_cookie(
+            JwtConfig::ACCESS_COOKIE_NAME,
+            value: access,
+            path: AUTH_COOKIE_PATH,
+            httponly: true,
+            secure: Rails.env.production?,
+            same_site: :lax,
+            expires: JwtConfig.access_token_ttl.from_now
+          )
+        end
 
         def session_params
           params.permit(:email, :phone_number, :phoneNumber, :password, :remember_me, :rememberMe)

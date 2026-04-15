@@ -35,7 +35,10 @@ RSpec.describe "Api::V1::Users::Sessions", type: :request do
         expect(payload["access_expires_in"]).to eq(900)
         expect(payload["remember_me"]).to be false
         expect(payload["user"]["email"]).to eq("jane@example.com")
-        expect(response.headers["Set-Cookie"]).to include("ss_refresh=")
+        expect_set_cookie_line(JwtConfig::REFRESH_COOKIE_NAME)
+        expect_set_cookie_line(JwtConfig::ACCESS_COOKIE_NAME)
+        expect_cookie_path_matches_auth_cookie_path(JwtConfig::REFRESH_COOKIE_NAME)
+        expect_cookie_path_matches_auth_cookie_path(JwtConfig::ACCESS_COOKIE_NAME)
         expect(UsersAuthentification.first.remember_me).to be false
       end
 
@@ -92,6 +95,8 @@ RSpec.describe "Api::V1::Users::Sessions", type: :request do
         expect(payload["access_token"]).to be_present
         expect(payload["access_token"]).not_to eq(access_before)
         expect(payload["access_expires_in"]).to eq(900)
+        expect_set_cookie_line(JwtConfig::ACCESS_COOKIE_NAME)
+        expect_cookie_path_matches_auth_cookie_path(JwtConfig::ACCESS_COOKIE_NAME)
       end
     end
 
@@ -117,6 +122,35 @@ RSpec.describe "Api::V1::Users::Sessions", type: :request do
         submit_refresh
 
         expect(response).to have_http_status(:unauthorized)
+      end
+    end
+
+    describe "GET /api/v1/users/sessions/me" do
+      context "when authenticated" do
+        it "returns the current user when Authorization Bearer is set" do
+          token = Api::V1::Users::JwtAccessToken.encode(user.id)
+          get me_api_v1_users_sessions_url, headers: { "Authorization" => "Bearer #{token}" }
+
+          expect(response).to have_http_status(:ok)
+          expect(response_json["user"]["email"]).to eq("jane@example.com")
+        end
+
+        it "returns the current user when the access cookie is present" do
+          submit_session(valid_login_payload)
+
+          get me_api_v1_users_sessions_url
+
+          expect(response).to have_http_status(:ok)
+          expect(response_json["user"]["email"]).to eq("jane@example.com")
+        end
+      end
+
+      context "when not authenticated" do
+        it "returns unauthorized" do
+          get me_api_v1_users_sessions_url
+
+          expect(response).to have_http_status(:unauthorized)
+        end
       end
     end
 
@@ -148,5 +182,25 @@ RSpec.describe "Api::V1::Users::Sessions", type: :request do
       password: default_password,
       remember_me: false
     }.merge(overrides)
+  end
+
+  # Une ligne Set-Cookie par jeton ; `set_access_cookie` / login posent `path: AUTH_COOKIE_PATH`.
+  def expect_set_cookie_line(cookie_name)
+    line = set_cookie_line_for(cookie_name)
+    expect(line).to be_present, "expected Set-Cookie line for #{cookie_name}"
+    line
+  end
+
+  def expect_cookie_path_matches_auth_cookie_path(cookie_name)
+    line = set_cookie_line_for(cookie_name)
+    expect(line).to be_present
+    expected = "path=#{Api::V1::Users::SessionsController::AUTH_COOKIE_PATH}"
+    expect(line.downcase).to include(expected.downcase)
+  end
+
+  def set_cookie_line_for(cookie_name)
+    Array.wrap(response.get_header("Set-Cookie")).find do |h|
+      h.to_s.start_with?("#{cookie_name}=")
+    end
   end
 end

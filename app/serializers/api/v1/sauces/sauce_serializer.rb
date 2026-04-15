@@ -40,13 +40,13 @@ module Api
         private
 
         def image_url
-          return @sauce.read_attribute(:image_url) unless @sauce.image.attached?
+          return nil unless @sauce.image.attached?
 
           blob = @sauce.image.blob
           path = rails_blob_path(blob, only_path: true)
           return "#{@base_url}#{path}" if path.present?
 
-          @sauce.read_attribute(:image_url)
+          nil
         end
       end
     end

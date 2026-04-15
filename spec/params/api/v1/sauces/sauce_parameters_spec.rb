@@ -16,7 +16,6 @@ RSpec.describe Api::V1::Sauces::SauceParameters do
           stock: { quantity: 5 },
           conditionings: [ { volume: "250ml", price: "6.9" } ],
           ingredients: [ { name: "Piment", quantity: "30%" } ],
-          imageUrl: "https://x",
           categoryId: "uuid-1"
         )
       ).permitted
@@ -25,7 +24,6 @@ RSpec.describe Api::V1::Sauces::SauceParameters do
       expect(permitted[:stock].to_unsafe_h).to eq("quantity" => 5)
       expect(permitted[:conditionings].first.to_unsafe_h).to eq("volume" => "250ml", "price" => "6.9")
       expect(permitted[:ingredients].first.to_unsafe_h).to eq("name" => "Piment", "quantity" => "30%")
-      expect(permitted[:imageUrl]).to eq("https://x")
       expect(permitted[:categoryId]).to eq("uuid-1")
     end
 

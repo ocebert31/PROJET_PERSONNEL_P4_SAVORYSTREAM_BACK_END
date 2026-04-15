@@ -5,8 +5,8 @@ require "rails_helper"
 RSpec.describe Api::V1::Sauces::SauceAttributesMapper do
   def permit_params(hash)
     ActionController::Parameters.new(hash).permit(
-      :name, :tagline, :description, :characteristic, :image_url, :is_available, :category_id,
-      :imageUrl, :isAvailable, :categoryId,
+      :name, :tagline, :description, :characteristic, :is_available, :category_id,
+      :isAvailable, :categoryId,
       stock: [ :quantity ],
       conditionings: [ :volume, :price ],
       ingredients: [ :name, :quantity ]
@@ -34,13 +34,6 @@ RSpec.describe Api::V1::Sauces::SauceAttributesMapper do
         name: "N", tagline: "T", description: "D", characteristic: "C"
       )
       expect(map(name: "Only")).to eq(name: "Only")
-    end
-
-    it "resolves image_url from snake_case, camelCase, prefers non-blank snake_case, and falls back when blank" do
-      expect(map(image_url: "https://a")).to eq(image_url: "https://a")
-      expect(map(imageUrl: "https://b")).to eq(image_url: "https://b")
-      expect(map(image_url: "https://first", imageUrl: "https://second")[:image_url]).to eq("https://first")
-      expect(map(image_url: "", imageUrl: "https://fallback")[:image_url]).to eq("https://fallback")
     end
 
     it "casts is_available from strings, camelCase, boolean false, and blank string + camel fallback" do
@@ -76,7 +69,6 @@ RSpec.describe Api::V1::Sauces::SauceAttributesMapper do
         tagline: "T",
         description: "D",
         characteristic: "C",
-        imageUrl: "https://img",
         isAvailable: "true",
         categoryId: category_id,
         stock: { quantity: 5 },
@@ -89,7 +81,6 @@ RSpec.describe Api::V1::Sauces::SauceAttributesMapper do
         tagline: "T",
         description: "D",
         characteristic: "C",
-        image_url: "https://img",
         is_available: true,
         category_id: category_id
       )

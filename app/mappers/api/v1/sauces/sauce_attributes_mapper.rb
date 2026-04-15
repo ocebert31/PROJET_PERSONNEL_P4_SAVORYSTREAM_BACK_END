@@ -19,7 +19,6 @@ module Api
           attrs[:tagline] = @p[:tagline] if @p.key?(:tagline)
           attrs[:description] = @p[:description] if @p.key?(:description)
           attrs[:characteristic] = @p[:characteristic] if @p.key?(:characteristic)
-          attrs[:image_url] = @p[:image_url].presence || @p[:imageUrl] if @p.key?(:image_url) || @p.key?(:imageUrl)
 
           if @p.key?(:is_available) || @p.key?(:isAvailable)
             raw = if @p.key?(:is_available)

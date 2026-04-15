@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_05_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_04_13_122000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -73,7 +73,6 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_05_120000) do
     t.string "characteristic", limit: 255
     t.datetime "created_at", null: false
     t.text "description"
-    t.text "image_url"
     t.boolean "is_available", default: true, null: false
     t.string "name", limit: 50, null: false
     t.string "tagline", limit: 120, null: false

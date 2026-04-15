@@ -26,15 +26,8 @@ RSpec.describe "Api::V1::Sauces::IndexController", type: :request do
         expect(response_json["sauces"]).to eq([])
       end
 
-      it "includes image_url for each sauce (nil, stored URL, or Active Storage)" do
+      it "includes image_url for each sauce (nil or Active Storage)" do
         plain = Sauce.create!(name: "Plain Sauce", tagline: "Sans image.", category: category, is_available: true)
-        external = Sauce.create!(
-          name: "External Sauce",
-          tagline: "URL colonne.",
-          category: category,
-          is_available: true,
-          image_url: "https://cdn.example.com/x.png"
-        )
         uploaded = Sauce.create!(name: "Uploaded Sauce", tagline: "Fichier.", category: category, is_available: true)
         uploaded.image.attach(fixture_file_upload(Rails.root.join("spec/fixtures/files/one_pixel.png"), "image/png"))
 
@@ -44,7 +37,6 @@ RSpec.describe "Api::V1::Sauces::IndexController", type: :request do
         by_name = response_json["sauces"].index_by { |s| s["name"] }
 
         expect(by_name["Plain Sauce"]["image_url"]).to be_nil
-        expect(by_name["External Sauce"]["image_url"]).to eq("https://cdn.example.com/x.png")
         expect(by_name["Uploaded Sauce"]["image_url"]).to be_present
         expect(by_name["Uploaded Sauce"]["image_url"]).to include("rails/active_storage")
       end
