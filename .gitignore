@@ -22,6 +22,7 @@
 !/storage/.keep
 /tmp/storage/*
 !/tmp/storage/.keep
+tmp/cache/bootsnap/
 
 # -----------------------------------------------------------------------------
 # Secrets — ne jamais versionner

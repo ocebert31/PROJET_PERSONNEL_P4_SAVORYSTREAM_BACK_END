@@ -1,6 +1,7 @@
 # SavoryStream — back-end (API)
 
-API **Rails 8.1** en mode **API-only** (PostgreSQL, authentification par mot de passe, CORS pour le front). Aujourd’hui centrée sur l’**authentification** ; le reste du contrat et de la stack est décrit dans Notion.
+API **Rails 8.1** en mode **API-only** (PostgreSQL, authentification par mot de passe, CORS pour le front).  
+Le back couvre actuellement les domaines **authentification/session** et **catalogue sauces**.
 
 ## Documentation
 
@@ -22,10 +23,13 @@ La **spec complète** (routes, contrat JSON, validations, structure, tests, CI, 
 
 ## Structure du dépôt (aperçu)
 
-- `app/controllers/api/v1/` — API versionnée (ex. `users/registrations`).
-- `app/models/` — Active Record.
-- `spec/` — specs **modèle** et **request** (contrat HTTP).
-- `.github/` — **CI** (`workflows/ci.yml`), **Dependabot** (`dependabot.yml`).
+- `app/` — coeur applicatif Rails (controllers, models, serializers, params, validators, concerns).
+- `app/controllers/api/v1/` — endpoints HTTP versionnés par domaine (`users`, `sauces`, etc.).
+- `config/` — routes (`config/routes*`) et configuration globale (initializers, environnement).
+- `db/` — migrations et `schema.rb` (état actuel de la base).
+- `spec/` — tests RSpec (request specs pour le contrat API + specs unitaires ciblées).
+- `bin/` — commandes d’exécution (`rails`, `rspec`, scripts CI locaux).
+- `.github/` — CI (`workflows/ci.yml`) et maintenance auto (`dependabot.yml`).
 
 Le détail des flux et conventions : **spec Notion**.
 
@@ -33,6 +37,7 @@ Le détail des flux et conventions : **spec Notion**.
 
 - **Ruby** 3.4.9 (voir `.ruby-version`) · **PostgreSQL** · **Bundler**
 - À la racine : `bundle install` puis `bin/rails db:prepare` (adapter `config/database.yml` si besoin).
+- Lancer l’API : `bin/rails server` (par défaut sur [localhost:3000](http://localhost:3000)).
 
 ## Variables d’environnement
 
