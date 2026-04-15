@@ -130,25 +130,25 @@ RSpec.describe "Api::V1::Users::Sessions", type: :request do
         it "returns the current user when Authorization Bearer is set" do
           token = Api::V1::Users::JwtAccessToken.encode(user.id)
           get me_api_v1_users_sessions_url, headers: { "Authorization" => "Bearer #{token}" }
-  
+
           expect(response).to have_http_status(:ok)
           expect(response_json["user"]["email"]).to eq("jane@example.com")
         end
-  
+
         it "returns the current user when the access cookie is present" do
           submit_session(valid_login_payload)
-  
+
           get me_api_v1_users_sessions_url
-  
+
           expect(response).to have_http_status(:ok)
           expect(response_json["user"]["email"]).to eq("jane@example.com")
         end
       end
-  
+
       context "when not authenticated" do
         it "returns unauthorized" do
           get me_api_v1_users_sessions_url
-  
+
           expect(response).to have_http_status(:unauthorized)
         end
       end
