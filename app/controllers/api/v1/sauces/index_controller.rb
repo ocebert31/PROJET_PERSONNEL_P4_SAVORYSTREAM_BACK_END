@@ -4,9 +4,6 @@ module Api
   module V1
     module Sauces
       class IndexController < ApplicationController
-        include Api::V1::Users::Authentication
-        before_action :authenticate_admin!
-
         def index
           # Hors cache : évite un jeu de lignes `active_storage_*` réutilisé à vide entre requêtes.
           # `preload(image_attachment: :blob)` remplace `with_attached_image`, qui peut casser

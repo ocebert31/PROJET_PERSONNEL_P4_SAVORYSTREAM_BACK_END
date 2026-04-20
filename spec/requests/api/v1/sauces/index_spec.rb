@@ -7,12 +7,12 @@ RSpec.describe "Api::V1::Sauces::IndexController", type: :request do
   include_context "API V1 sauces resource request setup"
 
   describe "GET /api/v1/sauces" do
-    context "when authenticated as admin" do
+    context "without authentication" do
       it "returns sauces ordered by name ascending" do
         Sauce.create!(name: "Zebra Sauce", tagline: "Z.", category: category, is_available: true)
         Sauce.create!(name: "Alpha Sauce", tagline: "A.", category: category, is_available: true)
 
-        get api_v1_sauces_url, headers: admin_headers
+        get api_v1_sauces_url
 
         expect(response).to have_http_status(:ok)
         names = response_json["sauces"].map { |s| s["name"] }
@@ -20,7 +20,7 @@ RSpec.describe "Api::V1::Sauces::IndexController", type: :request do
       end
 
       it "returns an empty list when there are no sauces" do
-        get api_v1_sauces_url, headers: admin_headers
+        get api_v1_sauces_url
 
         expect(response).to have_http_status(:ok)
         expect(response_json["sauces"]).to eq([])
@@ -31,7 +31,7 @@ RSpec.describe "Api::V1::Sauces::IndexController", type: :request do
         uploaded = Sauce.create!(name: "Uploaded Sauce", tagline: "Fichier.", category: category, is_available: true)
         uploaded.image.attach(fixture_file_upload(Rails.root.join("spec/fixtures/files/one_pixel.png"), "image/png"))
 
-        get api_v1_sauces_url, headers: admin_headers
+        get api_v1_sauces_url
 
         expect(response).to have_http_status(:ok)
         by_name = response_json["sauces"].index_by { |s| s["name"] }
@@ -42,20 +42,25 @@ RSpec.describe "Api::V1::Sauces::IndexController", type: :request do
       end
     end
 
-    context "when the access token is missing" do
-      it "returns unauthorized" do
-        get api_v1_sauces_url
+    context "when authenticated as customer" do
+      it "returns the catalogue" do
+        Sauce.create!(name: "Client Catalog Sauce", tagline: "C.", category: category, is_available: true)
 
-        expect(response).to have_http_status(:unauthorized)
+        get api_v1_sauces_url, headers: customer_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(response_json["sauces"].map { |s| s["name"] }).to include("Client Catalog Sauce")
       end
     end
 
-    context "when authenticated as customer" do
-      it "returns forbidden" do
-        get api_v1_sauces_url, headers: customer_headers
+    context "when authenticated as admin" do
+      it "returns the catalogue" do
+        Sauce.create!(name: "Admin Catalog Sauce", tagline: "A.", category: category, is_available: true)
 
-        expect(response).to have_http_status(:forbidden)
-        expect(response_json["message"]).to include("administrateurs")
+        get api_v1_sauces_url, headers: admin_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(response_json["sauces"].map { |s| s["name"] }).to include("Admin Catalog Sauce")
       end
     end
   end
