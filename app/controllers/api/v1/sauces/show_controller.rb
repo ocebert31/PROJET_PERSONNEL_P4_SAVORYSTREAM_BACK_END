@@ -4,9 +4,6 @@ module Api
   module V1
     module Sauces
       class ShowController < ApplicationController
-        include Api::V1::Users::Authentication
-        before_action :authenticate_admin!
-
         def show
           # `with_attached_image` + `find` peut laisser `image.attached?` à false (association vide en cache) ;
           # on précharge explicitement la pièce jointe pour un `image_url` correct.

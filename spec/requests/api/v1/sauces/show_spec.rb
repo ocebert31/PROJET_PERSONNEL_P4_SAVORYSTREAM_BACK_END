@@ -7,11 +7,11 @@ RSpec.describe "Api::V1::Sauces::ShowController", type: :request do
   include_context "API V1 sauces resource request setup"
 
   describe "GET /api/v1/sauces/:id" do
-    context "when authenticated as admin" do
+    context "without authentication" do
       it "returns the sauce payload" do
         sauce = Sauce.create!(name: "Sriracha Show", tagline: "Pimente tout.", category: category, is_available: true)
 
-        get api_v1_sauce_url(sauce.id), headers: admin_headers
+        get api_v1_sauce_url(sauce.id)
 
         expect(response).to have_http_status(:ok)
         expect(response_json["sauce"]["id"]).to eq(sauce.id)
@@ -25,7 +25,7 @@ RSpec.describe "Api::V1::Sauces::ShowController", type: :request do
         file = fixture_file_upload(Rails.root.join("spec/fixtures/files/one_pixel.png"), "image/png")
         sauce.image.attach(file)
 
-        get api_v1_sauce_url(sauce.id), headers: admin_headers
+        get api_v1_sauce_url(sauce.id)
 
         expect(response).to have_http_status(:ok)
         url = response_json["sauce"]["image_url"]
@@ -36,29 +36,31 @@ RSpec.describe "Api::V1::Sauces::ShowController", type: :request do
       it "returns not found for an unknown id" do
         unknown_id = "00000000-0000-0000-0000-000000000001"
 
-        get api_v1_sauce_url(unknown_id), headers: admin_headers
+        get api_v1_sauce_url(unknown_id)
 
         expect(response).to have_http_status(:not_found)
       end
     end
 
-    context "when the access token is missing" do
-      it "returns unauthorized" do
-        sauce = Sauce.create!(name: "Solo Sauce", tagline: "S.", category: category, is_available: true)
-
-        get api_v1_sauce_url(sauce.id)
-
-        expect(response).to have_http_status(:unauthorized)
-      end
-    end
-
     context "when authenticated as customer" do
-      it "returns forbidden" do
+      it "returns the sauce payload" do
         sauce = Sauce.create!(name: "Client Sauce", tagline: "C.", category: category, is_available: true)
 
         get api_v1_sauce_url(sauce.id), headers: customer_headers
 
-        expect(response).to have_http_status(:forbidden)
+        expect(response).to have_http_status(:ok)
+        expect(response_json["sauce"]["id"]).to eq(sauce.id)
+      end
+    end
+
+    context "when authenticated as admin" do
+      it "returns the sauce payload" do
+        sauce = Sauce.create!(name: "Admin View Sauce", tagline: "A.", category: category, is_available: true)
+
+        get api_v1_sauce_url(sauce.id), headers: admin_headers
+
+        expect(response).to have_http_status(:ok)
+        expect(response_json["sauce"]["id"]).to eq(sauce.id)
       end
     end
   end
