@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_04_13_122000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_02_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -41,6 +41,32 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_13_122000) do
     t.bigint "blob_id", null: false
     t.string "variation_digest", null: false
     t.index ["blob_id", "variation_digest"], name: "index_active_storage_variant_records_uniqueness", unique: true
+  end
+
+  create_table "cart_sauces", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.uuid "cart_id", null: false
+    t.uuid "conditioning_id", null: false
+    t.datetime "created_at", null: false
+    t.decimal "price", precision: 10, scale: 2, null: false
+    t.integer "quantity", null: false
+    t.uuid "sauce_id", null: false
+    t.datetime "updated_at", null: false
+    t.index ["cart_id", "conditioning_id"], name: "index_cart_sauces_on_cart_id_and_conditioning_id_unique", unique: true
+    t.index ["cart_id"], name: "index_cart_sauces_on_cart_id"
+    t.index ["conditioning_id"], name: "index_cart_sauces_on_conditioning_id"
+    t.index ["sauce_id"], name: "index_cart_sauces_on_sauce_id"
+    t.check_constraint "price >= 0::numeric", name: "cart_sauces_price_non_negative"
+    t.check_constraint "quantity > 0", name: "cart_sauces_quantity_positive"
+  end
+
+  create_table "carts", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.datetime "created_at", null: false
+    t.string "guest_id"
+    t.datetime "updated_at", null: false
+    t.uuid "user_id"
+    t.index ["guest_id"], name: "index_carts_on_guest_id", unique: true, where: "(guest_id IS NOT NULL)"
+    t.index ["user_id"], name: "index_carts_on_user_id", unique: true
+    t.check_constraint "user_id IS NOT NULL AND guest_id IS NULL OR user_id IS NULL AND guest_id IS NOT NULL", name: "carts_user_id_xor_guest_id"
   end
 
   create_table "categories", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
@@ -117,6 +143,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_04_13_122000) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
+  add_foreign_key "cart_sauces", "carts"
+  add_foreign_key "cart_sauces", "conditionings"
+  add_foreign_key "cart_sauces", "sauces"
+  add_foreign_key "carts", "users"
   add_foreign_key "conditionings", "sauces"
   add_foreign_key "ingredients", "sauces"
   add_foreign_key "sauces", "categories"

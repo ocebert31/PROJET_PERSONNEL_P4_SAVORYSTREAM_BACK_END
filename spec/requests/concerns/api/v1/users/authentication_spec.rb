@@ -31,6 +31,11 @@ RSpec.describe Api::V1::Users::Authentication, type: :controller do
     def raw_access_token_probe
       render json: { raw: raw_access_token }, status: :ok
     end
+
+    def user_from_access_token_probe
+      user = user_from_access_token
+      render json: { user_id: user&.id }, status: :ok
+    end
   end
 
   before do
@@ -40,6 +45,7 @@ RSpec.describe Api::V1::Users::Authentication, type: :controller do
       get :authenticate_user_probe, to: "anonymous#authenticate_user_probe"
       get :bearer_token_probe, to: "anonymous#bearer_token_probe"
       get :raw_access_token_probe, to: "anonymous#raw_access_token_probe"
+      get :user_from_access_token_probe, to: "anonymous#user_from_access_token_probe"
     end
   end
 
@@ -248,6 +254,62 @@ RSpec.describe Api::V1::Users::Authentication, type: :controller do
 
       expect(response).to have_http_status(:ok)
       expect(json_response["raw"]).to be_nil
+    end
+  end
+
+  describe "#user_from_access_token" do
+    it "returns nil when no token is present" do
+      get :user_from_access_token_probe
+
+      expect(response).to have_http_status(:ok)
+      expect(json_response["user_id"]).to be_nil
+    end
+
+    it "returns the user when Bearer carries a valid access token" do
+      user = create(:user)
+      token = Api::V1::Users::JwtAccessToken.encode(user.id)
+      request.headers["Authorization"] = "Bearer #{token}"
+
+      get :user_from_access_token_probe
+
+      expect(response).to have_http_status(:ok)
+      expect(json_response["user_id"]).to eq(user.id)
+    end
+
+    it "reads the token from the access cookie when Authorization is missing" do
+      user = create(:user)
+      token = Api::V1::Users::JwtAccessToken.encode(user.id)
+      request.cookies[JwtConfig::ACCESS_COOKIE_NAME] = token
+
+      get :user_from_access_token_probe
+
+      expect(response).to have_http_status(:ok)
+      expect(json_response["user_id"]).to eq(user.id)
+    end
+
+    it "returns nil when typ is not access" do
+      user = create(:user)
+      token = JWT.encode(
+        { sub: user.id, typ: "refresh", exp: 1.hour.from_now.to_i, iat: Time.current.to_i, jti: SecureRandom.uuid },
+        JwtConfig.secret,
+        "HS256"
+      )
+      request.headers["Authorization"] = "Bearer #{token}"
+
+      get :user_from_access_token_probe
+
+      expect(response).to have_http_status(:ok)
+      expect(json_response["user_id"]).to be_nil
+    end
+
+    it "returns nil when sub matches no user" do
+      token = Api::V1::Users::JwtAccessToken.encode(SecureRandom.uuid)
+      request.headers["Authorization"] = "Bearer #{token}"
+
+      get :user_from_access_token_probe
+
+      expect(response).to have_http_status(:ok)
+      expect(json_response["user_id"]).to be_nil
     end
   end
 end

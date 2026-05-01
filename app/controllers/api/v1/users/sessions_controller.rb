@@ -10,6 +10,7 @@ module Api
         # de la requête (ex. login sur …/users/sessions) et il n’est plus envoyé sur …/sauces.
         # Constante ici (pas dans un initializer seul) pour éviter un NameError en rechargement à chaud.
         AUTH_COOKIE_PATH = "/".freeze
+        GUEST_CART_COOKIE_NAME = "guest_cart_id"
 
         # Connexion : valide email ou téléphone + mot de passe, puis émet un JWT d'accès et un refresh token
         # persisté (table users_authentification). Réponse inclut l'utilisateur et les durées d'expiration.
@@ -23,6 +24,8 @@ module Api
           unless user&.authenticate(session_params[:password])
             return render json: { message: "Impossible de vous connecter. Vérifiez vos informations." }, status: :unauthorized
           end
+
+          transfer_guest_cart_to_user(user)
 
           # « Se souvenir de moi » : accepte remember_me ou rememberMe (camelCase), défaut false si absent (évite nil).
           # ActiveModel::Type::Boolean normalise les chaînes ("true", "1", etc.) en vrai booléen.
@@ -124,6 +127,24 @@ module Api
 
         def session_params
           params.permit(:email, :phone_number, :phoneNumber, :password, :remember_me, :rememberMe)
+        end
+
+        def transfer_guest_cart_to_user(user)
+          guest_id = cookies[GUEST_CART_COOKIE_NAME].presence
+          return if guest_id.blank?
+
+          Api::V1::Carts::GuestCartTransferService.new(user: user, guest_id: guest_id).call
+          delete_guest_cart_cookie
+        end
+
+        def delete_guest_cart_cookie
+          response.delete_cookie(
+            GUEST_CART_COOKIE_NAME,
+            path: AUTH_COOKIE_PATH,
+            httponly: true,
+            secure: Rails.env.production?,
+            same_site: :lax
+          )
         end
 
         def find_user(identification)

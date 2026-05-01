@@ -21,15 +21,21 @@ module Api
         end
 
         def authenticate_user!
-          payload = JwtAccessToken.decode(raw_access_token)
-          unless payload&.dig("typ") == "access"
-            return render json: { message: "Token d'accès invalide ou manquant." }, status: :unauthorized
-          end
-
-          @current_user = User.find_by(id: payload["sub"])
+          @current_user = user_from_access_token
           return if @current_user.present?
 
           render json: { message: "Token d'accès invalide ou manquant." }, status: :unauthorized
+        end
+
+        # User from access JWT (Bearer or cookie) without rendering — for optional-auth flows (e.g. cart).
+        def user_from_access_token
+          token = raw_access_token
+          return nil if token.blank?
+
+          payload = JwtAccessToken.decode(token)
+          return nil unless payload&.dig("typ") == "access"
+
+          User.find_by(id: payload["sub"])
         end
 
         def bearer_token

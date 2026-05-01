@@ -9,6 +9,7 @@ Rails.application.routes.draw do
     namespace :v1 do
       draw "api/v1/users"
       draw "api/v1/sauces"
+      draw "api/v1/carts"
     end
   end
 
