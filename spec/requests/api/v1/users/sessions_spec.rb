@@ -191,9 +191,16 @@ RSpec.describe "Api::V1::Users::Sessions", type: :request do
   end
 
   def submit_session(credentials)
-    guest_cart_id = credentials.delete(:guest_cart_id)
-    cookies["guest_cart_id"] = guest_cart_id if guest_cart_id.present?
-    post api_v1_users_sessions_url, params: credentials, as: :json
+    payload = credentials.deep_dup
+    guest_cart_id = payload.delete(:guest_cart_id)
+
+    headers = {}
+    if guest_cart_id.present?
+      # Rack ne voit pas toujours `cookies` avant une première requête ; envoyer le jeton invité en Cookie.
+      headers["Cookie"] = "guest_cart_id=#{guest_cart_id}"
+    end
+
+    post api_v1_users_sessions_url, params: payload, as: :json, headers: headers
   end
 
   def submit_refresh(params = {})

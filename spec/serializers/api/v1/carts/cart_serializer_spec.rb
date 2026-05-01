@@ -42,7 +42,7 @@ RSpec.describe Api::V1::Carts::CartSerializer do
       json = described_class.call(cart.reload)
 
       expect(json[:items].map { |row| row[:sauce_name] }).to eq(
-        ["First in time", "Second in time"]
+        [ "First in time", "Second in time" ]
       )
     end
 
