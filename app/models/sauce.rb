@@ -11,6 +11,10 @@ class Sauce < ApplicationRecord
   has_one :stock, dependent: :destroy
   has_many :conditionings, dependent: :destroy
   has_many :ingredients, dependent: :destroy
+  has_many :cart_sauces
+  has_many :carts, through: :cart_sauces
+
+  before_destroy :purge_cart_sauce_lines, prepend: true
 
   accepts_nested_attributes_for :stock, update_only: true
   accepts_nested_attributes_for :conditionings
@@ -20,4 +24,10 @@ class Sauce < ApplicationRecord
   validates :tagline, presence: true, length: { maximum: 120 }
   validates :characteristic, length: { maximum: 255 }, allow_blank: true
   validates :is_available, inclusion: { in: [ true, false ] }
+
+  private
+
+  def purge_cart_sauce_lines
+    CartSauce.where(sauce_id: id).delete_all
+  end
 end

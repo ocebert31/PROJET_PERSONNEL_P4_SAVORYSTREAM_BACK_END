@@ -4,6 +4,7 @@ class User < ApplicationRecord
   # Sessions persistées côté API : un utilisateur peut avoir plusieurs enregistrements (ex. appareils).
   # dependent: :destroy supprime ces lignes si le compte utilisateur est effacé (pas de lignes orphelines).
   has_many :users_authentications, class_name: "UsersAuthentification", inverse_of: :user, dependent: :destroy
+  has_one :cart, dependent: :destroy
 
   enum :role, { customer: "customer", admin: "admin" }, default: :customer
 

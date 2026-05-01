@@ -5,18 +5,7 @@ require "rails_helper"
 RSpec.describe UsersAuthentification, type: :model do
   include ActiveSupport::Testing::TimeHelpers
 
-  let(:password) { "password12" }
-
-  let!(:user) do
-    User.create!(
-      first_name: "Jane",
-      last_name: "Doe",
-      email: "jane@example.com",
-      phone_number: "0612345678",
-      password: password,
-      password_confirmation: password
-    )
-  end
+  let!(:user) { create(:user, email: "jane@example.com", phone_number: "0612345678") }
 
   before { described_class.delete_all }
 
@@ -40,36 +29,21 @@ RSpec.describe UsersAuthentification, type: :model do
       _raw, first = described_class.create_for_user!(user, remember_me: false)
       digest = first.token_digest
 
-      duplicate = described_class.new(
-        user: user,
-        token_digest: digest,
-        expires_at: 7.days.from_now,
-        remember_me: false
-      )
+      duplicate = build(:users_authentification, user: user, token_digest: digest)
 
       expect(duplicate.save).to be false
       expect(duplicate.errors[:token_digest]).to be_present
     end
 
     it "rejects missing token_digest" do
-      row = described_class.new(
-        user: user,
-        token_digest: nil,
-        expires_at: 7.days.from_now,
-        remember_me: false
-      )
+      row = build(:users_authentification, token_digest: nil)
 
       expect(row.save).to be false
       expect(row.errors[:token_digest]).to be_present
     end
 
     it "rejects missing expires_at" do
-      row = described_class.new(
-        user: user,
-        token_digest: "a" * 64,
-        expires_at: nil,
-        remember_me: false
-      )
+      row = build(:users_authentification, token_digest: "a" * 64, expires_at: nil)
 
       expect(row.save).to be false
       expect(row.errors[:expires_at]).to be_present

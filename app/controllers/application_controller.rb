@@ -1,6 +1,10 @@
 class ApplicationController < ActionController::API
   include ActionController::Cookies
 
+  rescue_from ActionController::BadRequest do |exception|
+    render json: { message: exception.message }, status: :bad_request
+  end
+
   before_action :set_active_storage_url_options
 
   private

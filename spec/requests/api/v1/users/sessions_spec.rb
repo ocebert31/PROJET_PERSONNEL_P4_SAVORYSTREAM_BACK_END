@@ -6,6 +6,8 @@ RSpec.describe "Api::V1::Users::Sessions", type: :request do
   let(:default_password) { "password12" }
 
   before do
+    CartSauce.delete_all
+    Cart.delete_all
     User.delete_all
     UsersAuthentification.delete_all
   end
@@ -66,6 +68,30 @@ RSpec.describe "Api::V1::Users::Sessions", type: :request do
         expires = Time.zone.parse(response_json["refresh_expires_at"])
         expect(expires).to be < 20.days.from_now
         expect(expires).to be > 5.days.from_now
+      end
+
+      it "attaches guest cart to user on login and removes guest cookie" do
+        guest_cart = Cart.create!(guest_id: "guest-123")
+
+        submit_session(valid_login_payload.merge(guest_cart_id: "guest-123"))
+
+        expect(response).to have_http_status(:ok)
+        expect(guest_cart.reload.user_id).to eq(user.id)
+        expect(guest_cart.guest_id).to be_nil
+        expect_set_cookie_line("guest_cart_id")
+        expect(set_cookie_line_for("guest_cart_id").downcase).to include("max-age=0")
+      end
+
+      it "keeps guest cart when both user and guest carts exist" do
+        existing_user_cart = Cart.create!(user: user)
+        guest_cart = Cart.create!(guest_id: "guest-456")
+
+        submit_session(valid_login_payload.merge(guest_cart_id: "guest-456"))
+
+        expect(response).to have_http_status(:ok)
+        expect(Cart.find_by(id: existing_user_cart.id)).to be_nil
+        expect(guest_cart.reload.user_id).to eq(user.id)
+        expect(guest_cart.guest_id).to be_nil
       end
     end
 
@@ -165,7 +191,16 @@ RSpec.describe "Api::V1::Users::Sessions", type: :request do
   end
 
   def submit_session(credentials)
-    post api_v1_users_sessions_url, params: credentials, as: :json
+    payload = credentials.deep_dup
+    guest_cart_id = payload.delete(:guest_cart_id)
+
+    headers = {}
+    if guest_cart_id.present?
+      # Rack ne voit pas toujours `cookies` avant une première requête ; envoyer le jeton invité en Cookie.
+      headers["Cookie"] = "guest_cart_id=#{guest_cart_id}"
+    end
+
+    post api_v1_users_sessions_url, params: payload, as: :json, headers: headers
   end
 
   def submit_refresh(params = {})
