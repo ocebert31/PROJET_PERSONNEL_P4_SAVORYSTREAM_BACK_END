@@ -22,6 +22,7 @@ RSpec.describe "Api::V1::Carts::ClearController", type: :request do
            params: { sauce_id: sauce.id, conditioning_id: conditioning.id, quantity: 2 },
            as: :json
       expect(response).to have_http_status(:ok)
+      expect(response_json["cart"]["items"].first["sauce_image_url"]).to be_nil
       cart_id_before = response_json["cart"]["id"]
 
       delete api_v1_cart_url, as: :json
@@ -35,6 +36,32 @@ RSpec.describe "Api::V1::Carts::ClearController", type: :request do
       expect(payload["cart"]["total_amount"]).to eq(0.0)
       expect(CartSauce.count).to eq(0)
       expect(Cart.find(cart_id_before)).to be_present
+    end
+
+    it "clears a cart after lines with images (DELETE uses CartSerializer with request.base_url)" do
+      sauce = create(:sauce, name: "Cart Clear With Thumbnail")
+      sauce.image.attach(
+        io: StringIO.new("x"),
+        filename: "thumb.png",
+        content_type: "image/png"
+      )
+      conditioning = create(:conditioning, sauce: sauce, price: 4.0)
+
+      host! "clear-cart-img.test"
+      post items_api_v1_cart_url,
+           params: { sauce_id: sauce.id, conditioning_id: conditioning.id, quantity: 1 },
+           as: :json
+      expect(response).to have_http_status(:ok)
+      expect(response_json["cart"]["items"].first["sauce_image_url"]).to start_with("http://clear-cart-img.test")
+      expect(response_json["cart"]["items"].first["sauce_image_url"]).to include("/rails/active_storage/")
+
+      delete api_v1_cart_url, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(response_json["message"]).to eq("Panier vidé.")
+      expect(response_json["cart"]["items"]).to be_empty
+      expect(response_json["cart"]["items_count"]).to eq(0)
+      expect(response_json["cart"]["total_amount"]).to eq(0.0)
     end
 
     it "clears user cart lines when authenticated" do

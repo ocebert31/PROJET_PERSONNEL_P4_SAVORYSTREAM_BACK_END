@@ -4,10 +4,12 @@ require "rails_helper"
 
 RSpec.describe Api::V1::Carts::CartSerializer do
   describe ".call" do
+    let(:base_url) { "http://www.example.com" }
+
     it "returns an empty-items payload with zero aggregates for a cart with no lines" do
       cart = create(:cart)
 
-      json = described_class.call(cart)
+      json = described_class.call(cart, base_url: base_url)
 
       expect(json[:id]).to eq(cart.id)
       expect(json[:user_id]).to eq(cart.user_id)
@@ -20,7 +22,7 @@ RSpec.describe Api::V1::Carts::CartSerializer do
     it "exposes guest_id and nil user_id on a guest-owned cart" do
       cart = create(:cart, :guest_owned)
 
-      json = described_class.call(cart)
+      json = described_class.call(cart, base_url: base_url)
 
       expect(json[:user_id]).to be_nil
       expect(json[:guest_id]).to eq(cart.guest_id)
@@ -39,7 +41,7 @@ RSpec.describe Api::V1::Carts::CartSerializer do
       early.update_column(:created_at, 100.seconds.ago)
       late.update_column(:created_at, 50.seconds.ago)
 
-      json = described_class.call(cart.reload)
+      json = described_class.call(cart.reload, base_url: base_url)
 
       expect(json[:items].map { |row| row[:sauce_name] }).to eq(
         [ "First in time", "Second in time" ]
@@ -56,7 +58,7 @@ RSpec.describe Api::V1::Carts::CartSerializer do
       line_a = create(:cart_sauce, cart: cart, sauce: sauce_a, conditioning: cond_a, quantity: 2, price: 4.50)
       line_b = create(:cart_sauce, cart: cart, sauce: sauce_b, conditioning: cond_b, quantity: 3, price: 2.25)
 
-      json = described_class.call(cart.reload)
+      json = described_class.call(cart.reload, base_url: base_url)
 
       expect(json[:items_count]).to eq(5)
       expect(json[:total_amount]).to eq(15.75)
@@ -67,6 +69,7 @@ RSpec.describe Api::V1::Carts::CartSerializer do
             id: line_a.id,
             sauce_id: sauce_a.id,
             sauce_name: "Nuoc mam",
+            sauce_image_url: nil,
             conditioning_id: cond_a.id,
             volume: "250ml",
             quantity: 2,
@@ -77,6 +80,7 @@ RSpec.describe Api::V1::Carts::CartSerializer do
             id: line_b.id,
             sauce_id: sauce_b.id,
             sauce_name: "Miso glaze",
+            sauce_image_url: nil,
             conditioning_id: cond_b.id,
             volume: "400ml",
             quantity: 3,
@@ -97,10 +101,44 @@ RSpec.describe Api::V1::Carts::CartSerializer do
       create(:cart_sauce, cart: cart, sauce: sauce_one, conditioning: cond_one, quantity: 2, price: 0.01)
       create(:cart_sauce, cart: cart, sauce: sauce_two, conditioning: cond_two, quantity: 1, price: 0.01)
 
-      json = described_class.call(cart.reload)
+      json = described_class.call(cart.reload, base_url: base_url)
 
       expect(json[:total_amount]).to eq(0.03)
       expect(json[:items_count]).to eq(3)
+    end
+
+    it "includes absolute sauce_image_url when the sauce has an image and base_url is present" do
+      cart = create(:cart)
+      sauce = create(:sauce)
+      sauce.image.attach(
+        io: StringIO.new("x"),
+        filename: "thumb.png",
+        content_type: "image/png"
+      )
+      cond = create(:conditioning, sauce: sauce, volume: "250ml", price: 1.0)
+      create(:cart_sauce, cart: cart, sauce: sauce, conditioning: cond, quantity: 1, price: 1.0)
+
+      json = described_class.call(cart.reload, base_url: "http://api.test")
+
+      url = json[:items].first[:sauce_image_url]
+      expect(url).to start_with("http://api.test")
+      expect(url).to include("/rails/active_storage/")
+    end
+
+    it "returns nil sauce_image_url when base_url is blank" do
+      cart = create(:cart)
+      sauce = create(:sauce)
+      sauce.image.attach(
+        io: StringIO.new("x"),
+        filename: "thumb.png",
+        content_type: "image/png"
+      )
+      cond = create(:conditioning, sauce: sauce, volume: "250ml", price: 1.0)
+      create(:cart_sauce, cart: cart, sauce: sauce, conditioning: cond, quantity: 1, price: 1.0)
+
+      json = described_class.call(cart.reload, base_url: nil)
+
+      expect(json[:items].first[:sauce_image_url]).to be_nil
     end
   end
 end

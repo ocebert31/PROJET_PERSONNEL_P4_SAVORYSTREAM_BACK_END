@@ -48,5 +48,43 @@ RSpec.describe "Api::V1::Carts::ShowController", type: :request do
       expect(response_json["cart"]["id"]).to eq(cart_id_first)
       expect(Cart.where(user: user).count).to eq(1)
     end
+
+    it "returns sauce_image_url null on cart lines when sauce has no image" do
+      sauce = create(:sauce, name: "Cart Show No Thumb")
+      conditioning = create(:conditioning, sauce: sauce)
+
+      post items_api_v1_cart_url,
+           params: { sauce_id: sauce.id, conditioning_id: conditioning.id, quantity: 1 },
+           as: :json
+      expect(response).to have_http_status(:ok)
+
+      get api_v1_cart_url, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(response_json["cart"]["items"].first["sauce_image_url"]).to be_nil
+    end
+
+    it "returns absolute sauce_image_url on GET when line has sauce image (serializer uses request.base_url)" do
+      sauce = create(:sauce, name: "Cart Show With Thumb")
+      sauce.image.attach(
+        io: StringIO.new("x"),
+        filename: "thumb.png",
+        content_type: "image/png"
+      )
+      conditioning = create(:conditioning, sauce: sauce)
+
+      host! "cart-show-img.test"
+      post items_api_v1_cart_url,
+           params: { sauce_id: sauce.id, conditioning_id: conditioning.id, quantity: 1 },
+           as: :json
+      expect(response).to have_http_status(:ok)
+
+      get api_v1_cart_url, as: :json
+
+      expect(response).to have_http_status(:ok)
+      url = response_json["cart"]["items"].first["sauce_image_url"]
+      expect(url).to start_with("http://cart-show-img.test")
+      expect(url).to include("/rails/active_storage/")
+    end
   end
 end

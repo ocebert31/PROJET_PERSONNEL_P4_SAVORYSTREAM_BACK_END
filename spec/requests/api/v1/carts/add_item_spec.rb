@@ -35,10 +35,29 @@ RSpec.describe "Api::V1::Carts::AddItemController", type: :request do
       expect(item["volume"]).to eq("250ml")
       expect(item["quantity"]).to eq(2)
       expect(item["unit_price"]).to eq(6.9)
+      expect(item["sauce_image_url"]).to be_nil
 
       cart = Cart.where(user_id: nil).where.not(guest_id: nil).take
       expect(cart).to be_present
       expect(CartSauce.where(cart: cart, conditioning: conditioning).count).to eq(1)
+    end
+
+    it "returns an absolute sauce_image_url when the sauce has an image (uses request.base_url)" do
+      sauce = create(:sauce, name: "Cart Add With Thumbnail")
+      sauce.image.attach(
+        io: StringIO.new("x"),
+        filename: "thumb.png",
+        content_type: "image/png"
+      )
+      conditioning = create(:conditioning, sauce: sauce, volume: "250ml", price: 5.0)
+
+      host! "add-item-img.test"
+      post_add_item(sauce_id: sauce.id, conditioning_id: conditioning.id, quantity: 1)
+
+      expect(response).to have_http_status(:ok)
+      url = response_json["cart"]["items"].first["sauce_image_url"]
+      expect(url).to start_with("http://add-item-img.test")
+      expect(url).to include("/rails/active_storage/")
     end
 
     it "increments quantity when posting the same conditioning again" do
