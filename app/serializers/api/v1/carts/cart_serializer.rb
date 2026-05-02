@@ -4,19 +4,23 @@ module Api
   module V1
     module Carts
       class CartSerializer
-        def self.call(cart)
-          items = cart.cart_sauces.includes(:sauce, :conditioning).order(created_at: :asc).map do |line|
-            {
-              id: line.id,
-              sauce_id: line.sauce_id,
-              sauce_name: line.sauce.name,
-              conditioning_id: line.conditioning_id,
-              volume: line.conditioning.volume,
-              quantity: line.quantity,
-              unit_price: line.price.to_f,
-              line_total: (line.quantity * line.price).to_f
-            }
-          end
+        def self.call(cart, base_url: nil)
+          items = cart.cart_sauces
+            .includes(:conditioning, sauce: { image_attachment: :blob })
+            .order(created_at: :asc)
+            .map do |line|
+              {
+                id: line.id,
+                sauce_id: line.sauce_id,
+                sauce_name: line.sauce.name,
+                sauce_image_url: Sauces::SauceSerializer.image_url_for(line.sauce, base_url: base_url),
+                conditioning_id: line.conditioning_id,
+                volume: line.conditioning.volume,
+                quantity: line.quantity,
+                unit_price: line.price.to_f,
+                line_total: (line.quantity * line.price).to_f
+              }
+            end
 
           {
             id: cart.id,

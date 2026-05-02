@@ -10,6 +10,12 @@ module Api
           new(sauce, base_url: base_url).as_json
         end
 
+        def self.image_url_for(sauce, base_url:)
+          return nil if base_url.blank?
+
+          new(sauce, base_url: base_url).send(:image_url)
+        end
+
         def initialize(sauce, base_url:)
           @sauce = sauce
           @base_url = base_url

@@ -7,7 +7,7 @@ module Api
         include Api::V1::Carts::CurrentCartSupport
 
         def show
-          render json: { cart: CartSerializer.call(current_cart) }, status: :ok
+          render json: { cart: CartSerializer.call(current_cart, base_url: request.base_url) }, status: :ok
         end
       end
     end

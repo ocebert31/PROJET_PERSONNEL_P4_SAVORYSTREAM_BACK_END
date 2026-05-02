@@ -32,11 +32,40 @@ RSpec.describe "Api::V1::Carts::UpdateItemController", type: :request do
       expect(item["quantity"]).to eq(4)
       expect(item["unit_price"]).to eq(5.55)
       expect(item["line_total"]).to eq(22.20)
+      expect(item["sauce_image_url"]).to be_nil
       expect(payload["cart"]["items_count"]).to eq(4)
       expect(payload["cart"]["total_amount"]).to eq(22.20)
 
       cart = Cart.where(user_id: nil).where.not(guest_id: nil).take
       expect(cart.cart_sauces.find(line_id).quantity).to eq(4)
+    end
+
+    it "returns absolute sauce_image_url on PATCH when line has sauce image (serializer uses request.base_url)" do
+      sauce = create(:sauce, name: "Cart Update With Thumb")
+      sauce.image.attach(
+        io: StringIO.new("x"),
+        filename: "thumb.png",
+        content_type: "image/png"
+      )
+      conditioning = create(:conditioning, sauce: sauce, price: 3.0)
+
+      host! "update-item-img.test"
+      post items_api_v1_cart_url,
+           params: { sauce_id: sauce.id, conditioning_id: conditioning.id, quantity: 2 },
+           as: :json
+      expect(response).to have_http_status(:ok)
+      expect(response_json["cart"]["items"].first["sauce_image_url"]).to start_with("http://update-item-img.test")
+      expect(response_json["cart"]["items"].first["sauce_image_url"]).to include("/rails/active_storage/")
+      line_id = response_json["cart"]["items"].first["id"]
+
+      patch item_api_v1_cart_url(line_id), params: { quantity: 3 }, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(response_json["message"]).to eq("Quantité mise à jour.")
+      url = response_json["cart"]["items"].first["sauce_image_url"]
+      expect(url).to start_with("http://update-item-img.test")
+      expect(url).to include("/rails/active_storage/")
+      expect(response_json["cart"]["items"].first["quantity"]).to eq(3)
     end
 
     it "removes line when quantity is 0" do

@@ -21,6 +21,7 @@ RSpec.describe "Api::V1::Carts::RemoveItemController", type: :request do
            params: { sauce_id: sauce.id, conditioning_id: conditioning.id, quantity: 2 },
            as: :json
       expect(response).to have_http_status(:ok)
+      expect(response_json["cart"]["items"].first["sauce_image_url"]).to be_nil
       line_id = response_json["cart"]["items"].first["id"]
 
       delete item_api_v1_cart_url(line_id), as: :json
@@ -30,6 +31,33 @@ RSpec.describe "Api::V1::Carts::RemoveItemController", type: :request do
       expect(payload["message"]).to eq("Article retiré du panier.")
       expect(payload["cart"]["items"]).to be_empty
       expect(payload["cart"]["items_count"]).to eq(0)
+      expect(CartSauce.count).to eq(0)
+    end
+
+    it "removes a line from a cart with sauce image (serializer uses request.base_url)" do
+      sauce = create(:sauce, name: "Cart Remove With Thumbnail")
+      sauce.image.attach(
+        io: StringIO.new("x"),
+        filename: "thumb.png",
+        content_type: "image/png"
+      )
+      conditioning = create(:conditioning, sauce: sauce, price: 5.0)
+
+      host! "remove-item-img.test"
+      post items_api_v1_cart_url,
+           params: { sauce_id: sauce.id, conditioning_id: conditioning.id, quantity: 1 },
+           as: :json
+      expect(response).to have_http_status(:ok)
+      expect(response_json["cart"]["items"].first["sauce_image_url"]).to start_with("http://remove-item-img.test")
+      expect(response_json["cart"]["items"].first["sauce_image_url"]).to include("/rails/active_storage/")
+      line_id = response_json["cart"]["items"].first["id"]
+
+      delete item_api_v1_cart_url(line_id), as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(response_json["message"]).to eq("Article retiré du panier.")
+      expect(response_json["cart"]["items"]).to be_empty
+      expect(response_json["cart"]["items_count"]).to eq(0)
       expect(CartSauce.count).to eq(0)
     end
 
