@@ -14,7 +14,13 @@ module Api
                  .order(:name)
                  .to_a
           end
-          render json: { sauces: sauces.map { |s| SauceSerializer.call(s, base_url: request.base_url) } }, status: :ok
+          pricing = LocaleHints::CatalogPricingContext.from(request)
+
+          render json: {
+            sauces: sauces.map { |s|
+              SauceSerializer.call(s, base_url: request.base_url, catalog_pricing: pricing)
+            }
+          }, status: :ok
         end
       end
     end

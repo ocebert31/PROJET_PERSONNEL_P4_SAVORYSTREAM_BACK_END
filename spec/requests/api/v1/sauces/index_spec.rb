@@ -26,6 +26,30 @@ RSpec.describe "Api::V1::Sauces::IndexController", type: :request do
         expect(response_json["sauces"]).to eq([])
       end
 
+      it "includes display_currency EUR and exposes euro TTC as prices when Accept-Language is absent" do
+        sauce = Sauce.create!(name: "Euro Priced Sauce", tagline: "e", category: category, is_available: true)
+        Conditioning.create!(sauce: sauce, volume: "250ml", price: 7.49)
+
+        get api_v1_sauces_url
+
+        row = response_json["sauces"].find { |s| s["name"] == "Euro Priced Sauce" }
+        expect(row["display_currency"]).to eq("EUR")
+        expect(row["prices_base_currency"]).to eq("EUR")
+        expect(row["conditionings"].first["price"]).to eq("7.49")
+      end
+
+      it "multiplies nominal EUR prices for en-US inferred market USD" do
+        sauce = Sauce.create!(name: "US Priced Sauce", tagline: "u", category: category, is_available: true)
+        Conditioning.create!(sauce: sauce, volume: "250ml", price: 100)
+
+        get api_v1_sauces_url, headers: { "Accept-Language" => "en-US;q=1" }
+
+        row = response_json["sauces"].find { |s| s["name"] == "US Priced Sauce" }
+        expect(row["display_currency"]).to eq("USD")
+        expect(row["prices_base_currency"]).to eq("EUR")
+        expect(row["conditionings"].first["price"]).to eq("108.0")
+      end
+
       it "includes image_url for each sauce (nil or Active Storage)" do
         plain = Sauce.create!(name: "Plain Sauce", tagline: "Sans image.", category: category, is_available: true)
         uploaded = Sauce.create!(name: "Uploaded Sauce", tagline: "Fichier.", category: category, is_available: true)

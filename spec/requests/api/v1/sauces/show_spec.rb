@@ -18,6 +18,19 @@ RSpec.describe "Api::V1::Sauces::ShowController", type: :request do
         expect(response_json["sauce"]["tagline"]).to eq("Pimente tout.")
         expect(response_json["sauce"]["category"]["id"]).to eq(category.id)
         expect(response_json["sauce"]["image_url"]).to be_nil
+        expect(response_json["sauce"]["display_currency"]).to eq("EUR")
+        expect(response_json["sauce"]["prices_base_currency"]).to eq("EUR")
+      end
+
+      it "returns USD-converted conditioning prices when market is inferred en-US" do
+        sauce = Sauce.create!(name: "USD Show Sauce", tagline: "usd", category: category, is_available: true)
+        Conditioning.create!(sauce: sauce, volume: "500ml", price: 10)
+
+        get api_v1_sauce_url(sauce.id), headers: { "Accept-Language" => "en-US" }
+
+        body = response_json["sauce"]
+        expect(body["display_currency"]).to eq("USD")
+        expect(body["conditionings"].first["price"]).to eq("10.8")
       end
 
       it "returns an Active Storage image_url when an image is attached" do

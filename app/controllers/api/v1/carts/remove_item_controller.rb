@@ -12,7 +12,9 @@ module Api
 
           render json: {
             message: "Article retiré du panier.",
-            cart: CartSerializer.call(current_cart, base_url: request.base_url)
+            cart: CartSerializer.call(current_cart,
+                                      base_url: request.base_url,
+                                      catalog_pricing: LocaleHints::CatalogPricingContext.from(request))
           }, status: :ok
         end
       end

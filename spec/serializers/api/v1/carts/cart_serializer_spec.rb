@@ -6,139 +6,219 @@ RSpec.describe Api::V1::Carts::CartSerializer do
   describe ".call" do
     let(:base_url) { "http://www.example.com" }
 
-    it "returns an empty-items payload with zero aggregates for a cart with no lines" do
-      cart = create(:cart)
-
-      json = described_class.call(cart, base_url: base_url)
-
-      expect(json[:id]).to eq(cart.id)
-      expect(json[:user_id]).to eq(cart.user_id)
-      expect(json[:guest_id]).to be_nil
-      expect(json[:items_count]).to eq(0)
-      expect(json[:total_amount]).to eq(0.0)
-      expect(json[:items]).to eq([])
+    def serialize(cart, catalog_pricing: nil)
+      described_class.call(cart.reload, base_url: base_url, catalog_pricing: catalog_pricing)
     end
 
-    it "exposes guest_id and nil user_id on a guest-owned cart" do
-      cart = create(:cart, :guest_owned)
+    describe "without catalog_pricing" do
+      it "returns an empty-items payload with zero aggregates and no currency metadata" do
+        cart = create(:cart)
+        json = serialize(cart)
 
-      json = described_class.call(cart, base_url: base_url)
+        expect(json[:id]).to eq(cart.id)
+        expect(json[:user_id]).to eq(cart.user_id)
+        expect(json[:guest_id]).to be_nil
+        expect(json[:items_count]).to eq(0)
+        expect(json[:total_amount]).to eq(0.0)
+        expect(json[:items]).to eq([])
+        expect(json.key?(:display_currency)).to be(false)
+        expect(json.key?(:prices_base_currency)).to be(false)
+      end
 
-      expect(json[:user_id]).to be_nil
-      expect(json[:guest_id]).to eq(cart.guest_id)
-      expect(json[:items]).to eq([])
+      it "exposes guest_id and nil user_id on a guest-owned cart" do
+        cart = create(:cart, :guest_owned)
+        json = serialize(cart)
+
+        expect(json[:user_id]).to be_nil
+        expect(json[:guest_id]).to eq(cart.guest_id)
+        expect(json[:items]).to eq([])
+      end
+
+      it "lists lines sorted by cart_sauce created_at ascending" do
+        cart = create(:cart)
+        sauce_early = create(:sauce, name: "First in time")
+        sauce_late = create(:sauce, name: "Second in time")
+        cond_early = create(:conditioning, sauce: sauce_early, volume: "250ml", price: 1.0)
+        cond_late = create(:conditioning, sauce: sauce_late, volume: "250ml", price: 1.0)
+
+        early = create(:cart_sauce, cart: cart, sauce: sauce_early, conditioning: cond_early, quantity: 1, price: 1.0)
+        late = create(:cart_sauce, cart: cart, sauce: sauce_late, conditioning: cond_late, quantity: 1, price: 1.0)
+        early.update_column(:created_at, 100.seconds.ago)
+        late.update_column(:created_at, 50.seconds.ago)
+
+        json = serialize(cart)
+
+        expect(json[:items].map { |row| row[:sauce_name] }).to eq(
+          [ "First in time", "Second in time" ]
+        )
+      end
+
+      it "maps sauce and conditioning fields and computes aggregates from line.price snapshots" do
+        cart = create(:cart)
+        sauce_a = create(:sauce, name: "Nuoc mam")
+        sauce_b = create(:sauce, name: "Miso glaze")
+        cond_a = create(:conditioning, sauce: sauce_a, volume: "250ml", price: 4.50)
+        cond_b = create(:conditioning, sauce: sauce_b, volume: "400ml", price: 2.25)
+
+        line_a = create(:cart_sauce, cart: cart, sauce: sauce_a, conditioning: cond_a, quantity: 2, price: 4.50)
+        line_b = create(:cart_sauce, cart: cart, sauce: sauce_b, conditioning: cond_b, quantity: 3, price: 2.25)
+
+        json = serialize(cart)
+
+        expect(json[:items_count]).to eq(5)
+        expect(json[:total_amount]).to eq(15.75)
+
+        expect(json[:items]).to eq(
+          [
+            {
+              id: line_a.id,
+              sauce_id: sauce_a.id,
+              sauce_name: "Nuoc mam",
+              sauce_image_url: nil,
+              conditioning_id: cond_a.id,
+              volume: "250ml",
+              quantity: 2,
+              unit_price: 4.5,
+              line_total: 9.0
+            },
+            {
+              id: line_b.id,
+              sauce_id: sauce_b.id,
+              sauce_name: "Miso glaze",
+              sauce_image_url: nil,
+              conditioning_id: cond_b.id,
+              volume: "400ml",
+              quantity: 3,
+              unit_price: 2.25,
+              line_total: 6.75
+            }
+          ]
+        )
+      end
+
+      it "uses the cart line unit price snapshot, not the current conditioning catalog price" do
+        cart = create(:cart)
+        sauce = create(:sauce)
+        cond = create(:conditioning, sauce: sauce, volume: "250ml", price: 12.0)
+        create(:cart_sauce, cart: cart, sauce: sauce, conditioning: cond, quantity: 1, price: 8.0)
+        cond.update!(price: 15.0)
+
+        json = serialize(cart)
+        row = json[:items].first
+
+        expect(row[:unit_price]).to eq(8.0)
+        expect(row[:line_total]).to eq(8.0)
+        expect(json[:total_amount]).to eq(8.0)
+      end
+
+      it "rounds total_amount to two decimal places across lines" do
+        cart = create(:cart)
+        sauce_one = create(:sauce)
+        sauce_two = create(:sauce)
+        cond_one = create(:conditioning, sauce: sauce_one, volume: "100ml", price: 0.01)
+        cond_two = create(:conditioning, sauce: sauce_two, volume: "100ml", price: 0.01)
+
+        create(:cart_sauce, cart: cart, sauce: sauce_one, conditioning: cond_one, quantity: 2, price: 0.01)
+        create(:cart_sauce, cart: cart, sauce: sauce_two, conditioning: cond_two, quantity: 1, price: 0.01)
+
+        json = serialize(cart)
+
+        expect(json[:total_amount]).to eq(0.03)
+        expect(json[:items_count]).to eq(3)
+      end
+
+      it "includes absolute sauce_image_url when the sauce has an image and base_url is present" do
+        cart = create(:cart)
+        sauce = create(:sauce)
+        sauce.image.attach(
+          io: StringIO.new("x"),
+          filename: "thumb.png",
+          content_type: "image/png"
+        )
+        cond = create(:conditioning, sauce: sauce, volume: "250ml", price: 1.0)
+        create(:cart_sauce, cart: cart, sauce: sauce, conditioning: cond, quantity: 1, price: 1.0)
+
+        json = described_class.call(cart.reload, base_url: "http://api.test", catalog_pricing: nil)
+        url = json[:items].first[:sauce_image_url]
+
+        expect(url).to start_with("http://api.test")
+        expect(url).to include("/rails/active_storage/")
+      end
+
+      it "returns nil sauce_image_url when base_url is blank" do
+        cart = create(:cart)
+        sauce = create(:sauce)
+        sauce.image.attach(
+          io: StringIO.new("x"),
+          filename: "thumb.png",
+          content_type: "image/png"
+        )
+        cond = create(:conditioning, sauce: sauce, volume: "250ml", price: 1.0)
+        create(:cart_sauce, cart: cart, sauce: sauce, conditioning: cond, quantity: 1, price: 1.0)
+
+        json = described_class.call(cart.reload, base_url: nil, catalog_pricing: nil)
+
+        expect(json[:items].first[:sauce_image_url]).to be_nil
+      end
     end
 
-    it "lists lines sorted by cart_sauce created_at ascending" do
-      cart = create(:cart)
-      sauce_early = create(:sauce, name: "First in time")
-      sauce_late = create(:sauce, name: "Second in time")
-      cond_early = create(:conditioning, sauce: sauce_early, volume: "250ml", price: 1.0)
-      cond_late = create(:conditioning, sauce: sauce_late, volume: "250ml", price: 1.0)
+    describe "with catalog_pricing" do
+      let(:catalog_pricing) { { currency_iso: "USD", eur_multiplier: BigDecimal("1.08") } }
 
-      early = create(:cart_sauce, cart: cart, sauce: sauce_early, conditioning: cond_early, quantity: 1, price: 1.0)
-      late = create(:cart_sauce, cart: cart, sauce: sauce_late, conditioning: cond_late, quantity: 1, price: 1.0)
-      early.update_column(:created_at, 100.seconds.ago)
-      late.update_column(:created_at, 50.seconds.ago)
+      it "multiplies EUR TTC snapshots by the catalogue multiplier and exposes display metadata" do
+        cart = create(:cart)
+        sauce = create(:sauce)
+        cond = create(:conditioning, sauce: sauce, volume: "250ml", price: 100.0)
+        create(:cart_sauce, cart: cart, sauce: sauce, conditioning: cond, quantity: 2, price: 100.0)
 
-      json = described_class.call(cart.reload, base_url: base_url)
+        json = serialize(cart, catalog_pricing: catalog_pricing)
 
-      expect(json[:items].map { |row| row[:sauce_name] }).to eq(
-        [ "First in time", "Second in time" ]
-      )
-    end
+        expect(json[:display_currency]).to eq("USD")
+        expect(json[:prices_base_currency]).to eq("EUR")
 
-    it "maps sauce and conditioning fields and computes aggregates" do
-      cart = create(:cart)
-      sauce_a = create(:sauce, name: "Nuoc mam")
-      sauce_b = create(:sauce, name: "Miso glaze")
-      cond_a = create(:conditioning, sauce: sauce_a, volume: "250ml", price: 4.50)
-      cond_b = create(:conditioning, sauce: sauce_b, volume: "400ml", price: 2.25)
+        row = json[:items].first
+        expect(row[:unit_price]).to eq(
+          Pricing::CatalogAmountConversion.convert_to_float(100.0, catalog_pricing)
+        )
+        expect(row[:line_total]).to eq(
+          Pricing::CatalogAmountConversion.convert_to_float(200.0, catalog_pricing)
+        )
+        expect(json[:total_amount]).to eq(
+          Pricing::CatalogAmountConversion.convert_to_float(200.0, catalog_pricing)
+        )
+      end
 
-      line_a = create(:cart_sauce, cart: cart, sauce: sauce_a, conditioning: cond_a, quantity: 2, price: 4.50)
-      line_b = create(:cart_sauce, cart: cart, sauce: sauce_b, conditioning: cond_b, quantity: 3, price: 2.25)
+      it "sets total_amount to the sum of converted line totals across multiple lines" do
+        cart = create(:cart)
+        sauce_a = create(:sauce)
+        sauce_b = create(:sauce)
+        cond_a = create(:conditioning, sauce: sauce_a, volume: "250ml", price: 10.0)
+        cond_b = create(:conditioning, sauce: sauce_b, volume: "500ml", price: 5.0)
 
-      json = described_class.call(cart.reload, base_url: base_url)
+        create(:cart_sauce, cart: cart, sauce: sauce_a, conditioning: cond_a, quantity: 2, price: 10.0)
+        create(:cart_sauce, cart: cart, sauce: sauce_b, conditioning: cond_b, quantity: 3, price: 5.0)
 
-      expect(json[:items_count]).to eq(5)
-      expect(json[:total_amount]).to eq(15.75)
+        json = serialize(cart, catalog_pricing: catalog_pricing)
 
-      expect(json[:items]).to eq(
-        [
-          {
-            id: line_a.id,
-            sauce_id: sauce_a.id,
-            sauce_name: "Nuoc mam",
-            sauce_image_url: nil,
-            conditioning_id: cond_a.id,
-            volume: "250ml",
-            quantity: 2,
-            unit_price: 4.5,
-            line_total: 9.0
-          },
-          {
-            id: line_b.id,
-            sauce_id: sauce_b.id,
-            sauce_name: "Miso glaze",
-            sauce_image_url: nil,
-            conditioning_id: cond_b.id,
-            volume: "400ml",
-            quantity: 3,
-            unit_price: 2.25,
-            line_total: 6.75
-          }
-        ]
-      )
-    end
+        line_totals = json[:items].map { |row| row[:line_total] }
+        expect(json[:total_amount]).to eq(line_totals.sum.round(2))
+        expect(json[:total_amount]).to eq(
+          Pricing::CatalogAmountConversion.convert_to_float(35.0, catalog_pricing)
+        )
+      end
 
-    it "rounds total_amount to two decimal places across lines" do
-      cart = create(:cart)
-      sauce_one = create(:sauce)
-      sauce_two = create(:sauce)
-      cond_one = create(:conditioning, sauce: sauce_one, volume: "100ml", price: 0.01)
-      cond_two = create(:conditioning, sauce: sauce_two, volume: "100ml", price: 0.01)
+      it "omits display metadata when catalog_pricing is blank" do
+        cart = create(:cart)
+        sauce = create(:sauce)
+        cond = create(:conditioning, sauce: sauce, volume: "250ml", price: 10.0)
+        create(:cart_sauce, cart: cart, sauce: sauce, conditioning: cond, quantity: 1, price: 10.0)
 
-      create(:cart_sauce, cart: cart, sauce: sauce_one, conditioning: cond_one, quantity: 2, price: 0.01)
-      create(:cart_sauce, cart: cart, sauce: sauce_two, conditioning: cond_two, quantity: 1, price: 0.01)
+        json = serialize(cart, catalog_pricing: {})
 
-      json = described_class.call(cart.reload, base_url: base_url)
-
-      expect(json[:total_amount]).to eq(0.03)
-      expect(json[:items_count]).to eq(3)
-    end
-
-    it "includes absolute sauce_image_url when the sauce has an image and base_url is present" do
-      cart = create(:cart)
-      sauce = create(:sauce)
-      sauce.image.attach(
-        io: StringIO.new("x"),
-        filename: "thumb.png",
-        content_type: "image/png"
-      )
-      cond = create(:conditioning, sauce: sauce, volume: "250ml", price: 1.0)
-      create(:cart_sauce, cart: cart, sauce: sauce, conditioning: cond, quantity: 1, price: 1.0)
-
-      json = described_class.call(cart.reload, base_url: "http://api.test")
-
-      url = json[:items].first[:sauce_image_url]
-      expect(url).to start_with("http://api.test")
-      expect(url).to include("/rails/active_storage/")
-    end
-
-    it "returns nil sauce_image_url when base_url is blank" do
-      cart = create(:cart)
-      sauce = create(:sauce)
-      sauce.image.attach(
-        io: StringIO.new("x"),
-        filename: "thumb.png",
-        content_type: "image/png"
-      )
-      cond = create(:conditioning, sauce: sauce, volume: "250ml", price: 1.0)
-      create(:cart_sauce, cart: cart, sauce: sauce, conditioning: cond, quantity: 1, price: 1.0)
-
-      json = described_class.call(cart.reload, base_url: nil)
-
-      expect(json[:items].first[:sauce_image_url]).to be_nil
+        expect(json.key?(:display_currency)).to be(false)
+        expect(json.key?(:prices_base_currency)).to be(false)
+        expect(json[:items].first[:unit_price]).to eq(10.0)
+      end
     end
   end
 end

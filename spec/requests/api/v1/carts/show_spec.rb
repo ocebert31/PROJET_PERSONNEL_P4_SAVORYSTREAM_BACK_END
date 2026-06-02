@@ -13,6 +13,36 @@ RSpec.describe "Api::V1::Carts::ShowController", type: :request do
   end
 
   describe "GET /api/v1/carts" do
+    it "includes catalog display currency hints (default market EUR)" do
+      get api_v1_cart_url
+
+      expect(response).to have_http_status(:ok)
+      cart = response_json["cart"]
+      expect(cart["display_currency"]).to eq("EUR")
+      expect(cart["prices_base_currency"]).to eq("EUR")
+    end
+
+    it "converts stored EUR line snapshots to USD amounts when Accept-Language implies US market" do
+      sauce = create(:sauce, name: "Cart USD Get")
+      conditioning = create(:conditioning, sauce: sauce, volume: "250ml", price: 10.0)
+
+      post items_api_v1_cart_url,
+           params: { sauce_id: sauce.id, conditioning_id: conditioning.id, quantity: 2 },
+           as: :json
+      expect(response).to have_http_status(:ok)
+
+      get api_v1_cart_url,
+          headers: { "Accept-Language" => "en-US" },
+          as: :json
+
+      expect(response).to have_http_status(:ok)
+      cart = response_json["cart"]
+      expect(cart["display_currency"]).to eq("USD")
+      expect(cart["items"].first["unit_price"]).to eq(10.8)
+      expect(cart["items"].first["line_total"]).to eq(21.6)
+      expect(cart["total_amount"]).to eq(21.6)
+    end
+
     it "returns guest cart, sets guest cookie, and is idempotent" do
       get api_v1_cart_url
 
