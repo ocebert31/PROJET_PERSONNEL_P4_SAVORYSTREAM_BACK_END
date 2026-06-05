@@ -10,6 +10,7 @@ Rails.application.routes.draw do
       draw "api/v1/users"
       draw "api/v1/sauces"
       draw "api/v1/carts"
+      draw "api/v1/localisations"
     end
   end
 

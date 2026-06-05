@@ -1,0 +1,74 @@
+# Pays ISO 3166-1 alpha-2 → taux de TVA standard et devise locale (ISO 4217).
+#
+# - vat_rate : fraction décimale (ex. 0.20 pour 20 %). Application : prix_HT × (1 + vat_rate) = prix_TTC.
+# - currency : devise de référence pour ce marché (facturation ou affichage).
+#
+# Les valeurs sont indicatives ; votre expert-comptable / juriste doit les valider.
+---
+FR:
+  vat_rate: 0.2
+  currency: EUR
+
+DE:
+  vat_rate: 0.19
+  currency: EUR
+
+BE:
+  vat_rate: 0.21
+  currency: EUR
+
+ES:
+  vat_rate: 0.21
+  currency: EUR
+
+IT:
+  vat_rate: 0.22
+  currency: EUR
+
+PT:
+  vat_rate: 0.23
+  currency: EUR
+
+NL:
+  vat_rate: 0.21
+  currency: EUR
+
+AT:
+  vat_rate: 0.2
+  currency: EUR
+
+IE:
+  vat_rate: 0.23
+  currency: EUR
+
+LU:
+  vat_rate: 0.17
+  currency: EUR
+
+FI:
+  vat_rate: 0.255
+  currency: EUR
+
+GR:
+  vat_rate: 0.24
+  currency: EUR
+
+MC:
+  vat_rate: 0.2
+  currency: EUR
+
+GB:
+  vat_rate: 0.2
+  currency: GBP
+
+CH:
+  vat_rate: 0.081
+  currency: CHF
+
+US:
+  vat_rate: 0
+  currency: USD
+
+CA:
+  vat_rate: 0
+  currency: CAD

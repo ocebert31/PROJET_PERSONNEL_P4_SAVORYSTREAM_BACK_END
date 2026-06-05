@@ -123,6 +123,24 @@ RSpec.describe "Api::V1::Carts::AddItemController", type: :request do
       expect(response_json["cart"]["items"].first["unit_price"]).to eq(11.9)
     end
 
+    it "returns USD-converted unit and line totals when market is inferred from en-US" do
+      sauce = create(:sauce, name: "Cart Add USD")
+      conditioning = create(:conditioning, sauce: sauce, volume: "250ml", price: 10.0)
+
+      post items_api_v1_cart_url,
+           params: { sauce_id: sauce.id, conditioning_id: conditioning.id, quantity: 3 },
+           headers: { "Accept-Language" => "en-US" },
+           as: :json
+
+      expect(response).to have_http_status(:ok)
+      cart = response_json["cart"]
+      expect(cart["display_currency"]).to eq("USD")
+      item = cart["items"].first
+      expect(item["unit_price"]).to eq(10.8)
+      expect(item["line_total"]).to eq(32.4)
+      expect(cart["total_amount"]).to eq(32.4)
+    end
+
     it "defaults quantity to 1 when omitted" do
       sauce = create(:sauce, name: "Cart Default Qty")
       conditioning = create(:conditioning, sauce: sauce)

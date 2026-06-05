@@ -12,7 +12,11 @@ module Api
                  .preload(image_attachment: :blob)
                  .find(params[:id])
           end
-          render json: { sauce: SauceSerializer.call(sauce, base_url: request.base_url) }, status: :ok
+          pricing = LocaleHints::CatalogPricingContext.from(request)
+
+          render json: {
+            sauce: SauceSerializer.call(sauce, base_url: request.base_url, catalog_pricing: pricing)
+          }, status: :ok
         end
       end
     end

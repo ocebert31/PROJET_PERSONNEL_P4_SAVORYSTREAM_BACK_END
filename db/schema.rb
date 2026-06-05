@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_05_02_120000) do
+ActiveRecord::Schema[8.1].define(version: 2026_05_02_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -78,11 +78,12 @@ ActiveRecord::Schema[8.1].define(version: 2026_05_02_120000) do
 
   create_table "conditionings", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
     t.datetime "created_at", null: false
-    t.decimal "price", precision: 10, scale: 2, null: false
+    t.integer "price_ttc_cents", null: false
     t.uuid "sauce_id", null: false
     t.datetime "updated_at", null: false
     t.string "volume", limit: 20, null: false
     t.index ["sauce_id"], name: "index_conditionings_on_sauce_id"
+    t.check_constraint "price_ttc_cents >= 0", name: "conditionings_price_ttc_cents_non_negative"
   end
 
   create_table "ingredients", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

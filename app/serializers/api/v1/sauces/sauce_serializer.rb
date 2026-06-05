@@ -6,19 +6,20 @@ module Api
       class SauceSerializer
         include Rails.application.routes.url_helpers
 
-        def self.call(sauce, base_url:)
-          new(sauce, base_url: base_url).as_json
+        def self.call(sauce, base_url:, catalog_pricing: nil)
+          new(sauce, base_url: base_url, catalog_pricing: catalog_pricing).as_json
         end
 
         def self.image_url_for(sauce, base_url:)
           return nil if base_url.blank?
 
-          new(sauce, base_url: base_url).send(:image_url)
+          new(sauce, base_url: base_url, catalog_pricing: nil).send(:image_url)
         end
 
-        def initialize(sauce, base_url:)
+        def initialize(sauce, base_url:, catalog_pricing: nil)
           @sauce = sauce
           @base_url = base_url
+          @catalog_pricing = catalog_pricing
         end
 
         def as_json
@@ -33,17 +34,34 @@ module Api
             category: @sauce.category && { id: @sauce.category.id, name: @sauce.category.name },
             stock: @sauce.stock && { id: @sauce.stock.id, quantity: @sauce.stock.quantity },
             conditionings: @sauce.conditionings.order(:created_at).map do |c|
-              { id: c.id, volume: c.volume, price: c.price.to_s }
+              { id: c.id, volume: c.volume, price: format_catalog_unit_price(c) }
             end,
             ingredients: @sauce.ingredients.order(:created_at).map do |i|
               { id: i.id, name: i.name, quantity: i.quantity }
             end,
             created_at: @sauce.created_at,
             updated_at: @sauce.updated_at
-          }
+          }.merge(pricing_fields)
         end
 
         private
+
+        def pricing_fields
+          return {} if @catalog_pricing.blank?
+
+          {
+            display_currency: @catalog_pricing.fetch(:currency_iso),
+            prices_base_currency: "EUR"
+          }
+        end
+
+        # Base catalogue : prix TTC en euros dans la base ; valeur convertie avec le multiplicateur `eur_exchange_rates.yml`.
+        def format_catalog_unit_price(conditioning)
+          eur_amount = conditioning.price
+          return eur_amount.to_s("F") if @catalog_pricing.blank?
+
+          Pricing::CatalogAmountConversion.convert_to_string(eur_amount, @catalog_pricing)
+        end
 
         def image_url
           return nil unless @sauce.image.attached?

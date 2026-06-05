@@ -8,7 +8,12 @@ module Api
 
         def destroy
           current_cart.cart_sauces.destroy_all
-          render json: { message: "Panier vidé.", cart: CartSerializer.call(current_cart, base_url: request.base_url) }, status: :ok
+          render json: {
+            message: "Panier vidé.",
+            cart: CartSerializer.call(current_cart,
+                                      base_url: request.base_url,
+                                      catalog_pricing: LocaleHints::CatalogPricingContext.from(request))
+          }, status: :ok
         end
       end
     end

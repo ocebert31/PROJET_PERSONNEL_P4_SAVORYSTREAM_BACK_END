@@ -18,7 +18,12 @@ module Api
             message = "Quantité mise à jour."
           end
 
-          render json: { message: message, cart: CartSerializer.call(current_cart, base_url: request.base_url) }, status: :ok
+          render json: {
+            message: message,
+            cart: CartSerializer.call(current_cart,
+                                      base_url: request.base_url,
+                                      catalog_pricing: LocaleHints::CatalogPricingContext.from(request))
+          }, status: :ok
         end
       end
     end

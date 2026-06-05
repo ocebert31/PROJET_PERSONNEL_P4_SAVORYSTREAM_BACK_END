@@ -1,0 +1,19 @@
+# Taux pour convertir un montant exprimé en EUR vers chaque devise cible :
+#   montant_devise_cible = montant_eur × taux
+#
+# Exemple : 100 EUR × USD rate → valeur approximative en USD pour l’UI ou des estimations.
+# En production : alimenter depuis une API (BCE, fournisseur de taux) ou des mises à jour planifiées.
+#
+# devise ISO 4217 → nombre décimal multiplier (EUR vers cette devise).
+---
+EUR: 1.0
+
+GBP: 0.87
+USD: 1.08
+CHF: 0.95
+CAD: 1.48
+PLN: 4.35
+SEK: 11.20
+NOK: 11.85
+DKK: 7.46
+JPY: 165
